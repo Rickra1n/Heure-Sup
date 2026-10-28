@@ -1,0 +1,2152 @@
+<!DOCTYPE html>
+<html lang="ht" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rickra1n Calcul heure supplementaire</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (XLSX) CDN for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK Modules for Cloud Data Sync -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'rickra1n-app-default';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        if (firebaseConfig) {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            // Authentication & Realtime Cloud Sync
+            const initAuthAndSync = async () => {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (e) {
+                    console.warn("Auth Fallback:", e);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (!user) return;
+                    window.currentUser = user;
+
+                    // Sync document reference according to mandatory path rules
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'payroll_database');
+
+                    // Real-time Cloud Listener
+                    onSnapshot(docRef, (snapshot) => {
+                        if (snapshot.exists()) {
+                            const cloudData = snapshot.data();
+                            if (cloudData && cloudData.appData) {
+                                window.appData = cloudData.appData;
+                                localStorage.setItem(window.STORAGE_KEY, JSON.stringify(window.appData));
+                                window.updateAllViews();
+                                const statusEl = document.getElementById('cloudSyncStatus');
+                                if (statusEl) {
+                                    statusEl.innerHTML = '<i class="fa-solid fa-cloud-check text-emerald-400"></i> Connected to Cloud DB';
+                                    statusEl.className = 'text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center gap-1.5';
+                                }
+                            }
+                        }
+                    }, (err) => {
+                        console.error("Firestore Listen Error:", err);
+                    });
+
+                    // Define Cloud Save Function globally
+                    window.saveDataToCloud = async (dataToSave) => {
+                        if (!auth.currentUser) return;
+                        try {
+                            await setDoc(docRef, {
+                                appData: dataToSave,
+                                updatedAt: new Date().toISOString()
+                            });
+                        } catch (err) {
+                            console.error("Cloud Save Error:", err);
+                        }
+                    };
+                });
+            };
+
+            initAuthAndSync();
+        }
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b'
+                        },
+                        slate: {
+                            850: '#121b2d',
+                            950: '#090d16'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Modern Enterprise Executive Dark Tokens */
+        :root {
+            --bg-main: #0b0f17;
+            --bg-surface: rgba(17, 24, 39, 0.75);
+            --bg-sidebar: #070a11;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-glow: rgba(16, 185, 129, 0.3);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --input-bg: rgba(11, 15, 23, 0.9);
+            --input-border: rgba(255, 255, 255, 0.12);
+            --accent-primary: #10b981;
+            --accent-indigo: #6366f1;
+            --card-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+            --card-shadow-hover: 0 16px 35px -5px rgba(16, 185, 129, 0.15);
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Floating Dollar Animations in Background */
+        .dollar-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .floating-dollar {
+            position: absolute;
+            bottom: -50px;
+            color: rgba(16, 185, 129, 0.15);
+            font-size: 1.8rem;
+            font-weight: 800;
+            user-select: none;
+            animation: floatUp 12s linear infinite;
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) rotate(0deg) scale(0.8);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.6;
+            }
+            90% {
+                opacity: 0.6;
+            }
+            100% {
+                transform: translateY(-110vh) rotate(360deg) scale(1.2);
+                opacity: 0;
+            }
+        }
+
+        /* Ambient Subtle Background Lighting */
+        .ambient-glow-1 {
+            position: fixed;
+            top: -15%;
+            left: -10%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.03) 50%, transparent 70%);
+            filter: blur(100px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .ambient-glow-2 {
+            position: fixed;
+            bottom: -15%;
+            right: -5%;
+            width: 45vw;
+            height: 45vw;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.03) 50%, transparent 70%);
+            filter: blur(100px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Glassmorphism Cards */
+        .ui-card {
+            background: var(--bg-surface);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--card-shadow);
+            border-radius: 1rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .ui-card:hover {
+            border-color: var(--border-glow);
+            box-shadow: var(--card-shadow-hover);
+        }
+
+        /* Glass Floating Header */
+        .floating-header {
+            background: rgba(11, 15, 23, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Text Gradients */
+        .text-gradient-emerald {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Buttons */
+        .btn-primary-glow {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: #ffffff;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary-glow:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+            filter: brightness(1.08);
+        }
+
+        .tab-content:not(.hidden) {
+            animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .glass-input {
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text-main);
+            transition: all 0.2s ease;
+        }
+        .glass-input:focus {
+            border-color: var(--accent-primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+
+        .sidebar-link {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .sidebar-link.active {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border-right: 3px solid #10b981;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+
+        /* Print formatting */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .no-print, nav, sidebar, header, .ambient-glow-1, .ambient-glow-2 {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .ui-card {
+                background: white !important;
+                border: 1px solid #cbd5e1 !important;
+                box-shadow: none !important;
+                color: black !important;
+                backdrop-filter: none !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 8px !important;
+                color: black !important;
+            }
+        }
+        .print-only {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col lg:flex-row antialiased pb-20 lg:pb-0 relative">
+
+    <!-- AMBIENT BACKGROUND LIGHTING & FLOATING DOLLARS -->
+    <div class="ambient-glow-1"></div>
+    <div class="ambient-glow-2"></div>
+    
+    <div class="dollar-container no-print">
+        <span class="floating-dollar" style="left: 5%; animation-delay: 0s; animation-duration: 10s;">$</span>
+        <span class="floating-dollar" style="left: 18%; animation-delay: 2s; animation-duration: 12s; font-size: 2.5rem;">$</span>
+        <span class="floating-dollar" style="left: 32%; animation-delay: 4s; animation-duration: 9s;">$</span>
+        <span class="floating-dollar" style="left: 48%; animation-delay: 1s; animation-duration: 14s; font-size: 2.2rem;">$</span>
+        <span class="floating-dollar" style="left: 62%; animation-delay: 5s; animation-duration: 11s;">$</span>
+        <span class="floating-dollar" style="left: 76%; animation-delay: 3s; animation-duration: 13s; font-size: 2.8rem;">$</span>
+        <span class="floating-dollar" style="left: 89%; animation-delay: 6s; animation-duration: 10s;">$</span>
+    </div>
+
+    <!-- SECURITY LOCK OVERLAY -->
+    <div id="pinLockModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md hidden">
+        <div class="ui-card p-8 rounded-2xl w-full max-w-md text-center border border-emerald-500/20 shadow-2xl mx-4">
+            <div class="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl border border-emerald-500/20">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-1">Sekirite Rickra1n</h2>
+            <p class="text-slate-400 text-xs mb-6">Antre kòd PIN aksè ou pou kontinye sou sistèm nan.</p>
+            <form id="pinForm" onsubmit="unlockApp(event)">
+                <input type="password" id="pinInput" maxlength="6" placeholder="****" class="glass-input text-center text-2xl tracking-widest w-full py-3 rounded-xl mb-4 text-emerald-400 font-bold">
+                <button type="submit" class="w-full btn-primary-glow font-bold py-3 rounded-xl transition">
+                    Débloke Sistem Nan
+                </button>
+            </form>
+            <p id="pinError" class="text-rose-400 text-xs mt-3 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Kòd PIN sa a pa bon!</p>
+        </div>
+    </div>
+
+    <!-- SIDEBAR FOR DESKTOP -->
+    <aside class="no-print hidden lg:flex flex-col w-64 bg-[#070a11] border-r border-white/10 flex-shrink-0 min-h-screen sticky top-0 h-screen z-40">
+        <!-- BRANDING -->
+        <div class="p-5 border-b border-white/10 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-emerald-500/20">
+                    R1
+                </div>
+                <div>
+                    <h1 class="font-bold text-base text-white tracking-tight leading-none">Rickra1n</h1>
+                    <span class="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Payroll Enterprise</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- NAVIGATION LINKS -->
+        <nav class="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
+            <div class="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Meni Prensipal</div>
+            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition">
+                <i class="fa-solid fa-chart-pie w-5 text-center"></i> Tablo Bò
+            </button>
+            <button onclick="switchTab('workers')" id="nav-workers" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-users w-5 text-center"></i> Ekip Travayè Yo
+            </button>
+            <button onclick="switchTab('overtime')" id="nav-overtime" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-clock w-5 text-center"></i> Saisie Lè
+            </button>
+            <button onclick="switchTab('bulk')" id="nav-bulk" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-layer-group w-5 text-center"></i> Saisie an Gros
+            </button>
+
+            <div class="pt-4 px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Rapò & Audits</div>
+            <button onclick="switchTab('worker-quinzaine')" id="nav-worker-quinzaine" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-id-card w-5 text-center"></i> Fich Pèsonèl (15j)
+            </button>
+            <button onclick="switchTab('audit')" id="nav-audit" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-history w-5 text-center"></i> Istwa Koreksyon
+            </button>
+            <button onclick="switchTab('payments')" id="nav-payments" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Rapò & Peman
+            </button>
+
+            <div class="pt-4 px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Zouti</div>
+            <button onclick="switchTab('calculator')" id="nav-calculator" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-calculator w-5 text-center"></i> Kalkilatris
+            </button>
+            <button onclick="switchTab('settings')" id="nav-settings" class="sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">
+                <i class="fa-solid fa-sliders w-5 text-center"></i> Paramèt
+            </button>
+        </nav>
+
+        <!-- FOOTER USER PROFILE -->
+        <div class="p-3 border-t border-white/10 bg-[#070a11]">
+            <div class="flex items-center gap-3 px-2 py-1.5">
+                <div class="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-xs font-bold text-emerald-400">
+                    AD
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-slate-200 truncate">Administratè</p>
+                    <p class="text-[10px] text-slate-500 truncate">Rickra1n System Pro</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="flex-1 flex flex-col min-w-0 z-10">
+        <!-- FLOATING TOP HEADER NAVBAR -->
+        <header class="no-print floating-header sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-6">
+            <div class="flex items-center gap-3">
+                <!-- MOBILE BRANDING -->
+                <div class="lg:hidden flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-400 text-white font-black text-sm flex items-center justify-center">R1</div>
+                    <span class="font-bold text-sm text-white">Rickra1n</span>
+                </div>
+                <div class="hidden sm:flex items-center gap-2 text-xs">
+                    <span id="cloudSyncStatus" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                        <i class="fa-solid fa-cloud text-emerald-400"></i> Local & Sync Ready
+                    </span>
+                </div>
+            </div>
+
+            <!-- MODERNE LIVE CLOCK & DATE DISPLAY -->
+            <div class="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900/80 border border-emerald-500/20 text-xs font-semibold shadow-inner">
+                <i class="fa-regular fa-calendar-days text-emerald-400"></i>
+                <span id="liveDateDisplay" class="text-slate-300 font-medium">--</span>
+                <span class="text-slate-600">|</span>
+                <i class="fa-regular fa-clock text-cyan-400"></i>
+                <span id="liveTimeDisplay" class="font-mono text-cyan-400 font-bold tracking-wider">00:00:00</span>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button id="lockBtn" onclick="lockApp()" class="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center gap-2 text-xs font-semibold" title="Veriye aksè">
+                    <i class="fa-solid fa-lock text-sm text-emerald-400"></i>
+                    <span class="hidden sm:inline">Veriye Sistem</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN BODY CONTAINER -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-6">
+
+            <!-- TAB 1: DASHBOARD OVERVIEW -->
+            <section id="tab-dashboard" class="tab-content space-y-6">
+                <!-- HERO WELCOME BANNER -->
+                <div class="ui-card p-6 sm:p-8 rounded-2xl relative overflow-hidden border border-white/10">
+                    <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="flex h-2.5 w-2.5 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                                </span>
+                                <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Sistèm An Liy & Aktif</span>
+                            </div>
+                            <h2 class="text-2xl sm:text-3xl font-extrabold mb-2 text-white">
+                                Rickra1n <span class="text-gradient-emerald">Overtime Enterprise</span>
+                            </h2>
+                            <p class="text-xs sm:text-sm text-slate-400 max-w-2xl leading-relaxed">
+                                Kalkile èdtan siplemantè travayè yo pa quinzaine (15 jou), kreye rapò Excel ak PDF, epi jere tarif ak majorasyon rapidman ak yon sèl aplikasyon pwofesyonèl.
+                            </p>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <button onclick="switchTab('overtime')" class="btn-primary-glow font-bold px-5 py-3 rounded-xl text-xs transition flex items-center gap-2">
+                                <i class="fa-solid fa-plus-circle"></i> Ajoute Lè
+                            </button>
+                            <button onclick="switchTab('bulk')" class="bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-bold px-5 py-3 rounded-xl text-xs transition flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group"></i> Saisie an Gros
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BENTO GRID METRICS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div class="ui-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-rose-500">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Poko Peye</p>
+                            <h3 id="statUnpaidAmount" class="text-2xl font-black text-rose-400 mt-1">0 HTG</h3>
+                            <p id="statUnpaidHours" class="text-xs text-slate-500 mt-1">0h siplemantè an atant</p>
+                        </div>
+                        <div class="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-400 text-xl border border-rose-500/20">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                    </div>
+
+                    <div class="ui-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-emerald-500">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Peye (Istwa)</p>
+                            <h3 id="statPaidAmount" class="text-2xl font-black text-emerald-400 mt-1">0 HTG</h3>
+                            <p id="statPaidHours" class="text-xs text-slate-500 mt-1">0h peye deja</p>
+                        </div>
+                        <div class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-400 text-xl border border-emerald-500/20">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+
+                    <div class="ui-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-indigo-500">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Ekip Travayè</p>
+                            <h3 id="statTotalWorkers" class="text-2xl font-black text-indigo-400 mt-1">0</h3>
+                            <p class="text-xs text-slate-500 mt-1">Travayè anrejistre</p>
+                        </div>
+                        <div class="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 text-xl border border-indigo-500/20">
+                            <i class="fa-solid fa-user-group"></i>
+                        </div>
+                    </div>
+
+                    <div class="ui-card p-5 rounded-2xl flex items-center justify-between border-l-4 border-l-teal-500">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Tarif De Baz</p>
+                            <h3 id="statCurrentRate" class="text-2xl font-black text-teal-400 mt-1">250 HTG</h3>
+                            <p class="text-xs text-slate-500 mt-1">Tarif pa defo / lè</p>
+                        </div>
+                        <div class="w-12 h-12 bg-teal-500/10 rounded-2xl flex items-center justify-center text-teal-400 text-xl border border-teal-500/20">
+                            <i class="fa-solid fa-tag"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BENTO SHOWCASE GRID -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 ui-card p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-base flex items-center gap-2 text-white">
+                                <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Dènye Saisie Ki Poko Peye
+                            </h3>
+                            <button onclick="switchTab('overtime')" class="text-xs text-emerald-400 hover:underline font-bold">
+                                + Ajoute Lè
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs sm:text-sm">
+                                <thead class="text-xs uppercase border-b border-white/10 text-slate-400">
+                                    <tr>
+                                        <th class="p-3">Dat</th>
+                                        <th class="p-3">Travayè</th>
+                                        <th class="p-3">Èdtan</th>
+                                        <th class="p-3">Montan</th>
+                                        <th class="p-3 text-right">Aksyon</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboardRecentTable" class="divide-y divide-white/5">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="ui-card p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-base mb-4 flex items-center gap-2 text-white">
+                                <i class="fa-solid fa-trophy text-amber-400"></i> Top Moun Ki Fè Plus Lè
+                            </h3>
+                            <div id="topEarnersList" class="space-y-4">
+                                <!-- Dynamic progress bars -->
+                            </div>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-white/10 text-center">
+                            <button onclick="switchTab('payments')" class="w-full py-2.5 bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold rounded-xl transition">
+                                Gade Rapò Konplè Pa Quinzaine <i class="fa-solid fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: WORKERS MANAGEMENT -->
+            <section id="tab-workers" class="tab-content space-y-6 hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Jere Ekip Travayè Yo</h2>
+                        <p class="text-xs text-slate-400">Ajoute, modifye oswa retire travayè ak ID inik nan sistèm nan.</p>
+                    </div>
+                    <button onclick="openWorkerModal()" class="btn-primary-glow font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-xs self-start md:self-auto">
+                        <i class="fa-solid fa-user-plus"></i> Ajoute Yon Travayè
+                    </button>
+                </div>
+
+                <!-- SMART SEARCH BAR -->
+                <div class="ui-card p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-3">
+                    <div class="relative flex-grow w-full">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+                        <input type="text" id="workerSearchInput" oninput="renderWorkersTable()" placeholder="Rechèch entèlijan: jwenn pa non, kòd ID, telefòn oswa depatman..." class="glass-input pl-9 pr-4 py-2 rounded-xl w-full text-xs font-medium">
+                    </div>
+                    <select id="workerDeptFilter" onchange="renderWorkersTable()" class="glass-input px-3 py-2 rounded-xl text-xs w-full sm:w-auto">
+                        <option value="ALL">Tout Depatman Yo</option>
+                    </select>
+                </div>
+
+                <!-- WORKERS TABLE -->
+                <div class="ui-card rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="text-xs uppercase border-b border-white/10 text-slate-400">
+                                <tr>
+                                    <th class="p-3 sm:p-4">ID Inik</th>
+                                    <th class="p-3 sm:p-4">Non Konplè</th>
+                                    <th class="p-3 sm:p-4">Pòs / Fonksyon</th>
+                                    <th class="p-3 sm:p-4">Depatman</th>
+                                    <th class="p-3 sm:p-4">Telefòn</th>
+                                    <th class="p-3 sm:p-4">Tarif</th>
+                                    <th class="p-3 sm:p-4 text-center">Aksyon</th>
+                                </tr>
+                            </thead>
+                            <tbody id="workersTableBody" class="divide-y divide-white/5">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: DAILY OVERTIME LOGGING -->
+            <section id="tab-overtime" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Anrejistre Èdtan Siplemantè</h2>
+                    <p class="text-xs text-slate-400">Antre lè pou yon travayè ak validasyon etap ak kontwòl doublon.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- ENTRY FORM -->
+                    <div class="ui-card p-6 rounded-2xl border-t-4 border-t-indigo-500">
+                        <h3 class="text-base font-bold mb-4 flex items-center gap-2 text-white">
+                            <i class="fa-solid fa-business-time text-cyan-400"></i> Formilè Saisie
+                        </h3>
+                        <form id="overtimeForm" onsubmit="saveOvertimeEntry(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Travayè *</label>
+                                <select id="otWorkerSelect" required class="glass-input w-full p-2.5 rounded-xl text-xs" onchange="checkDuplicateAndPreview()">
+                                    <option value="">-- Chwazi yon travayè --</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Dat *</label>
+                                    <input type="date" id="otDateInput" required class="glass-input w-full p-2.5 rounded-xl text-xs" onchange="checkDuplicateAndPreview()">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Kantite Lè *</label>
+                                    <input type="number" step="0.5" min="0.5" max="24" id="otHoursInput" required oninput="calculateOTFormPreview()" placeholder="Ex: 2.5" class="glass-input w-full p-2.5 rounded-xl text-xs font-bold text-cyan-400">
+                                </div>
+                            </div>
+
+                            <!-- DUPLICATE WARNING ALERT -->
+                            <div id="duplicateWarning" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs flex items-center gap-2">
+                                <i class="fa-solid fa-triangle-exclamation text-amber-400 flex-shrink-0"></i>
+                                <span><strong>Kontwòl Doublon:</strong> Travayè sa a gen yon antre pou dat sa a deja!</span>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Tip Lè / Majorasyon</label>
+                                <select id="otMultiplierSelect" onchange="calculateOTFormPreview()" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                                    <option value="1">Lè Nòmal (1.0x - 100%)</option>
+                                    <option value="1.5">Nwit / Dimanch (1.5x - 150%)</option>
+                                    <option value="2.0">Jou Ferye / Konje (2.0x - Double)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Nòt / Rezon</label>
+                                <input type="text" id="otNoteInput" placeholder="Eg: Travay ijan nan fèmti mwa" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                            </div>
+
+                            <!-- PREVIEW CARD -->
+                            <div class="p-3.5 rounded-xl border border-white/10 bg-black/20 space-y-1.5">
+                                <div class="flex justify-between text-xs text-slate-400">
+                                    <span>Tarif an aplikasyon:</span>
+                                    <span id="formCurrentRate" class="font-bold text-slate-200">250 HTG/h</span>
+                                </div>
+                                <div class="flex justify-between text-xs font-bold border-t border-white/10 pt-1.5 text-cyan-400">
+                                    <span>Montan Kalkile:</span>
+                                    <span id="formCalculatedTotal" class="text-sm">0 HTG</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full btn-primary-glow font-bold py-2.5 rounded-xl transition text-xs">
+                                <i class="fa-solid fa-plus-circle mr-1"></i> Anrejistre Lè Sa A
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- RECENT LOGS LIST -->
+                    <div class="lg:col-span-2 ui-card p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h3 class="text-base font-bold flex items-center gap-2 text-white">
+                                        <i class="fa-solid fa-list-check text-cyan-400"></i> Validasyon Etap Lè Yo
+                                    </h3>
+                                    <p class="text-xs text-slate-400">Etap: <strong>Antre</strong> ➔ <strong>Verifye</strong> ➔ <strong>Apwouve</strong> ➔ <strong>Peye</strong></p>
+                                </div>
+                                <div class="relative w-full sm:w-auto">
+                                    <input type="text" id="otSearchInput" oninput="renderOvertimeLogsTable()" placeholder="Rechèch..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-full">
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs sm:text-sm">
+                                    <thead class="text-xs uppercase border-b border-white/10 text-slate-400">
+                                        <tr>
+                                            <th class="p-3">Dat</th>
+                                            <th class="p-3">Travayè</th>
+                                            <th class="p-3">Èdtan</th>
+                                            <th class="p-3">Total (HTG)</th>
+                                            <th class="p-3">Statut</th>
+                                            <th class="p-3 text-right">Aksyon</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="otLogsTableBody" class="divide-y divide-white/5">
+                                        <!-- Dynamic entries -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3.5: BULK ENTRY -->
+            <section id="tab-bulk" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Saisie An Gros Pa Dat</h2>
+                    <p class="text-xs text-slate-400">Antre lè siplemantè pou plizyè travayè an menm tan rapidman.</p>
+                </div>
+
+                <div class="ui-card p-6 rounded-2xl space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Dat Pou Saisie A *</label>
+                            <input type="date" id="bulkDateInput" required class="glass-input w-full p-2.5 rounded-xl text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Majorasyon / Tip Lè</label>
+                            <select id="bulkMultiplierSelect" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                                <option value="1">Lè Nòmal (1.0x)</option>
+                                <option value="1.5">Nwit / Dimanch (1.5x)</option>
+                                <option value="2.0">Jou Ferye (2.0x)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Nòt Komen</label>
+                            <input type="text" id="bulkNoteInput" placeholder="Eg: Sèvis siplemantè fen mwa" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto border-t border-white/10 pt-4">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="text-xs uppercase border-b border-white/10 text-slate-400">
+                                <tr>
+                                    <th class="p-3 w-10">
+                                        <input type="checkbox" id="selectAllBulk" onchange="toggleSelectAllBulk(this)" class="rounded border-slate-700 text-indigo-500 focus:ring-cyan-400">
+                                    </th>
+                                    <th class="p-3">Travayè</th>
+                                    <th class="p-3">Depatman</th>
+                                    <th class="p-3">Kantite Lè</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulkWorkersTableBody" class="divide-y divide-white/5">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex justify-end pt-2">
+                        <button onclick="saveBulkOvertime()" class="btn-primary-glow font-bold px-5 py-2.5 rounded-xl transition text-xs">
+                            <i class="fa-solid fa-save mr-1"></i> Anrejistre Tout Lè Saisie Yo
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: AUDIT LOG -->
+            <section id="tab-audit" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Istwa Koreksyon Ak Modifikasyon (Audit Log)</h2>
+                    <p class="text-xs text-slate-400">Traçabilité konplè: konsève ansyen valè a, nouvo valè a, dat koreksyon an ak rezon an.</p>
+                </div>
+
+                <div class="ui-card p-6 rounded-2xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="text-xs uppercase border-b border-white/10 text-slate-400">
+                                <tr>
+                                    <th class="p-3">Dat Modifikasyon</th>
+                                    <th class="p-3">Travayè</th>
+                                    <th class="p-3">Dat Lè A</th>
+                                    <th class="p-3">Ansyen Lè</th>
+                                    <th class="p-3">Nouvèl Lè</th>
+                                    <th class="p-3">Rezon Koreksyon An</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auditLogsTableBody" class="divide-y divide-white/5">
+                                <!-- Dynamic audit rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4.5: WORKER INDIVIDUAL PROFILE -->
+            <section id="tab-worker-quinzaine" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Fich Pèsonèl Anplwaye & Istwa 15 Jou</h2>
+                    <p class="text-xs text-slate-400">Paj pèsonèl chak anplwaye ak istwa konplè lè siplemantè, statu validasyon, ak peman li.</p>
+                </div>
+
+                <div class="ui-card p-5 rounded-2xl no-print">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Chwazi Anplwaye *</label>
+                            <select id="singleWorkerSelect" onchange="renderIndividualWorkerQuinzaine()" class="glass-input w-full p-2.5 rounded-xl text-xs font-semibold">
+                                <option value="ALL">-- Tout Travayè Yo --</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Filtre Pa Estati Peman</label>
+                            <select id="singleWorkerStatusSelect" onchange="renderIndividualWorkerQuinzaine()" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                                <option value="ALL">Tout (Peye + Poko Peye)</option>
+                                <option value="UNPAID">Selman Sa Ki POKO PEYE</option>
+                                <option value="PAID">Selman Sa Ki PEYE DEJA</option>
+                            </select>
+                        </div>
+                        <div>
+                            <button onclick="printReport()" class="w-full bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-bold p-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs">
+                                <i class="fa-solid fa-print"></i> Enprime Fich Moun Sa A
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="workerQuinzaineCardsContainer" class="space-y-6">
+                    <!-- Cards rendered by JS -->
+                </div>
+            </section>
+
+            <!-- TAB 5: REPORTS & PAYMENTS -->
+            <section id="tab-payments" class="tab-content space-y-6 hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Istwa Peman & Rapò Pa Quinzaine</h2>
+                        <p class="text-xs text-slate-400">Gade detaye ak kantite chak grenn moun fè pou chak 15 jou (Quinzaine), epi ekspòte sou Excel oswa PDF.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="exportToExcel()" class="btn-primary-glow font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-xs">
+                            <i class="fa-solid fa-file-excel"></i> Excel (.xlsx)
+                        </button>
+                        <button onclick="printReport()" class="bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-xs">
+                            <i class="fa-solid fa-print"></i> PDF / Enprime
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FILTER BAR -->
+                <div class="ui-card p-5 rounded-2xl no-print">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Estati Lè Yo</label>
+                            <select id="reportPeriodSelect" onchange="renderReportsTable()" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                                <option value="UNPAID_ONLY" selected>Lè Ki POKO PEYE Yo Sèlman</option>
+                                <option value="PAID_ONLY">Istwa Lè Ki PEYE Yo (Pa Quinzaine)</option>
+                                <option value="ALL">Tout Lè Yo San Eksepsyon</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Depatman</label>
+                            <select id="reportDeptFilter" onchange="renderReportsTable()" class="glass-input w-full p-2.5 rounded-xl text-xs">
+                                <option value="ALL">Tout Depatman</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Rechèch Entèlijan</label>
+                            <input type="text" id="reportSearchInput" oninput="renderReportsTable()" placeholder="Non oswa ID..." class="glass-input w-full p-2.5 rounded-xl text-xs">
+                        </div>
+                        <div>
+                            <button onclick="payAllUnpaidForSelectedFilter()" class="w-full btn-primary-glow font-bold p-2.5 rounded-xl transition text-xs">
+                                Make Tout Sa Ki Poko Peye Kòm Peye
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EXECUTIVE PRINT HEADER ONLY VISIBLE DURING PRINT -->
+                <div class="print-only mb-6 text-center border-b-2 border-slate-900 pb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-left">
+                            <h1 class="text-2xl font-black uppercase tracking-wider">Rickra1n Overtime Pro</h1>
+                            <p class="text-xs font-bold text-gray-600">RAPÒ OFISYÈL HEURE SUPPLÉMENTAIRE AK PAIE</p>
+                        </div>
+                        <div class="text-right text-xs">
+                            <p><strong>Réf:</strong> R1-PAYROLL-${new Date().getFullYear()}</p>
+                            <p id="printDateStamp"></p>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 flex justify-between border-t border-gray-300 pt-2">
+                        <span>Peryòd: Quinzaine En kours</span>
+                        <span>Dokiman Pou Kontabilite Ak Direksyon</span>
+                    </div>
+                </div>
+
+                <!-- CONTAINER FOR DYNAMIC QUINZAINE TABLES -->
+                <div id="quinzaineReportsContainer" class="space-y-6">
+                    <!-- Dynamic quinzaine breakdowns will render here -->
+                </div>
+            </section>
+
+            <!-- TAB 5.5: QUICK CALCULATOR -->
+            <section id="tab-calculator" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Kalkilatris Rapid Paie & Lè</h2>
+                    <p class="text-xs text-slate-400">Kalkile rapidman sa yon travayè dwe touche pou n-importe ki kantite lè ak tarif san w pa bezwen anrejistre l.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="ui-card p-6 rounded-2xl border-t-4 border-t-indigo-500 space-y-4">
+                        <h3 class="font-bold text-base flex items-center gap-2 text-white">
+                            <i class="fa-solid fa-calculator text-cyan-400"></i> Antre Done Kalkil Yo
+                        </h3>
+
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Kantite Lè</label>
+                                <input type="number" step="0.5" id="calcHours" oninput="runQuickCalculator()" placeholder="Eg: 12.5" class="glass-input w-full p-2.5 rounded-xl font-bold text-base text-cyan-400">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Tarif Par Lè (HTG)</label>
+                                <input type="number" step="10" id="calcRate" oninput="runQuickCalculator()" value="250" class="glass-input w-full p-2.5 rounded-xl font-bold text-base">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Majorasyon / Koefisyan</label>
+                                <select id="calcMultiplier" onchange="runQuickCalculator()" class="glass-input w-full p-2.5 rounded-xl font-bold text-xs">
+                                    <option value="1">1.0x - Lè Nòmal (100%)</option>
+                                    <option value="1.5">1.5x - Nwit / Dimanch (150%)</option>
+                                    <option value="2.0">2.0x - Jou Ferye (200% / Double)</option>
+                                    <option value="2.5">2.5x - Lè Espesyal (250%)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ui-card p-6 rounded-2xl border-t-4 border-t-amber-500 flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-base mb-4 flex items-center gap-2 text-white">
+                                <i class="fa-solid fa-receipt text-amber-400"></i> Rezilta Kalkil La
+                            </h3>
+
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center pb-2 border-b border-white/10">
+                                    <span class="text-xs text-slate-400">Tarif an aplikasyon:</span>
+                                    <span id="calcDisplayRate" class="font-bold text-slate-200">250 HTG/h</span>
+                                </div>
+                                <div class="flex justify-between items-center pb-2 border-b border-white/10">
+                                    <span class="text-xs text-slate-400">Kantite Lè Entwodwi:</span>
+                                    <span id="calcDisplayHours" class="font-bold text-white">0 h</span>
+                                </div>
+                                <div class="p-4 bg-black/30 rounded-xl border border-white/10 text-center space-y-1">
+                                    <span class="text-xs uppercase font-bold text-slate-400">Total A Peye:</span>
+                                    <div id="calcDisplayTotal" class="text-2xl font-black text-cyan-400">0 HTG</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-500 text-center mt-4">
+                            * Kalkilatris sa a pa sove nan istorik la. Se pou kalkil rapid.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: SETTINGS & SECURITY -->
+            <section id="tab-settings" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Paramèt & Sekirite System Nan</h2>
+                    <p class="text-xs text-slate-400">Konfigure tarif par lè a, modpas/PIN, ak sovgarde done w yo.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="ui-card p-6 rounded-2xl space-y-4">
+                        <h3 class="font-bold text-base flex items-center gap-2 text-white">
+                            <i class="fa-solid fa-sliders text-emerald-400"></i> Konfigirasyon Tarif Par Lè
+                        </h3>
+                        <p class="text-xs text-slate-400">Tarif pa defo a se 250 HTG/h. Ou ka chanje li nenpòt kilè.</p>
+                        
+                        <form onsubmit="updateHourlyRate(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Tarif Par Lè (Nòmal: 250 HTG)</label>
+                                <div class="relative">
+                                    <input type="number" id="settingRateInput" required min="1" step="1" class="glass-input w-full p-2.5 pr-16 rounded-xl text-base font-bold text-emerald-400">
+                                    <span class="absolute right-3.5 top-3 text-slate-400 text-xs font-semibold">HTG / h</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary-glow font-bold px-4 py-2 rounded-xl text-xs transition">
+                                Anrejistre Tarif Sa A
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="ui-card p-6 rounded-2xl space-y-4">
+                        <h3 class="font-bold text-base flex items-center gap-2 text-white">
+                            <i class="fa-solid fa-shield-halved text-indigo-400"></i> Sekirite Ak Kòd PIN
+                        </h3>
+                        <p class="text-xs text-slate-400">Proteje aksè sou kalkil yo ak travayè yo lè w mete yon kòd PIN.</p>
+                        
+                        <form onsubmit="updatePinCode(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Nouvèl Kòd PIN (4-6 Chiffres)</label>
+                                <input type="password" id="settingPinInput" placeholder="Kite vid pou w retire PIN sa" maxlength="6" class="glass-input w-full p-2.5 rounded-xl text-xs tracking-widest font-bold">
+                            </div>
+                            <button type="submit" class="bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 font-bold px-4 py-2 rounded-xl text-xs transition">
+                                Anrejistre Kòd PIN
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="ui-card p-6 rounded-2xl space-y-4 md:col-span-2">
+                        <h3 class="font-bold text-base flex items-center gap-2 text-white">
+                            <i class="fa-solid fa-database text-emerald-400"></i> Sovgarder Ak Restitye Done Yo (Backup)
+                        </h3>
+                        <p class="text-xs text-slate-400">Telechaje yon kopi backup (JSON) oswa re-chaje yon ansyen backup pou evite pèdi done w yo.</p>
+
+                        <div class="flex flex-wrap gap-3 pt-2">
+                            <button onclick="downloadBackupJSON()" class="bg-white/5 hover:bg-white/10 text-slate-200 font-bold px-4 py-2.5 rounded-xl text-xs transition border border-white/10 flex items-center gap-2">
+                                <i class="fa-solid fa-download"></i> Telechaje Backup (JSON)
+                            </button>
+
+                            <label class="bg-white/5 hover:bg-white/10 text-slate-200 font-bold px-4 py-2.5 rounded-xl text-xs transition border border-white/10 flex items-center gap-2 cursor-pointer">
+                                <i class="fa-solid fa-upload"></i> Chaje Yon Backup JSON
+                                <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importBackupJSON(event)">
+                            </label>
+
+                            <button onclick="clearAllDataPrompt()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold px-4 py-2.5 rounded-xl text-xs transition border border-rose-500/20 ml-auto">
+                                <i class="fa-solid fa-trash-can mr-1"></i> Efase Tout Done System Nan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="border-t border-white/10 py-4 text-center text-xs text-slate-500 no-print mt-auto">
+            <p>© 2026 Rickra1n Calcul heure supplementaire — Enterprise Pro Edition</p>
+        </footer>
+    </div>
+
+    <!-- MOBILE NAVIGATION BOTTOM BAR -->
+    <nav class="no-print lg:hidden fixed bottom-0 left-0 right-0 bg-[#070a11]/95 backdrop-blur-xl border-t border-white/10 z-40 flex items-center justify-around py-2 px-1 shadow-2xl">
+        <button onclick="switchTab('dashboard')" id="mobile-nav-dashboard" class="mobile-nav-btn active flex flex-col items-center py-1 px-2 text-[10px] text-emerald-400 font-bold">
+            <i class="fa-solid fa-chart-pie text-base mb-0.5"></i> Tablo Bò
+        </button>
+        <button onclick="switchTab('workers')" id="mobile-nav-workers" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-[10px] text-slate-400 font-medium">
+            <i class="fa-solid fa-users text-base mb-0.5"></i> Ekip
+        </button>
+        <button onclick="switchTab('overtime')" id="mobile-nav-overtime" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-[10px] text-slate-400 font-medium">
+            <i class="fa-solid fa-clock text-base mb-0.5"></i> Saisie
+        </button>
+        <button onclick="switchTab('worker-quinzaine')" id="mobile-nav-worker-quinzaine" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-[10px] text-slate-400 font-medium">
+            <i class="fa-solid fa-id-card text-base mb-0.5"></i> 15 Jou
+        </button>
+        <button onclick="switchTab('payments')" id="mobile-nav-payments" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-[10px] text-slate-400 font-medium">
+            <i class="fa-solid fa-file-invoice-dollar text-base mb-0.5"></i> Rapò
+        </button>
+        <button onclick="switchTab('settings')" id="mobile-nav-settings" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-[10px] text-slate-400 font-medium">
+            <i class="fa-solid fa-gear text-base mb-0.5"></i> Opsyon
+        </button>
+    </nav>
+
+    <!-- MODAL: ADD / EDIT WORKER -->
+    <div id="workerModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden no-print px-4">
+        <div class="ui-card p-6 rounded-2xl w-full max-w-lg relative shadow-2xl">
+            <button onclick="closeWorkerModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-white text-base">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h3 id="workerModalTitle" class="text-lg font-bold mb-4">Ajoute Yon Travayè Nouvo</h3>
+
+            <form id="workerForm" onsubmit="saveWorkerForm(event)" class="space-y-3">
+                <input type="hidden" id="modalWorkerId">
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">ID Travayè (Inik)</label>
+                        <input type="text" id="modalWorkerCustomId" required placeholder="Eg: RK-1001" class="glass-input w-full p-2 rounded-xl text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Non Konplè *</label>
+                        <input type="text" id="modalWorkerName" required placeholder="Eg: Jean Baptiste" class="glass-input w-full p-2 rounded-xl text-xs">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Pòs / Tit Travay</label>
+                        <input type="text" id="modalWorkerPosition" required placeholder="Eg: Mèknisyen" class="glass-input w-full p-2 rounded-xl text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Depatman</label>
+                        <input type="text" id="modalWorkerDept" required placeholder="Eg: Opérations" class="glass-input w-full p-2 rounded-xl text-xs">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Telefòn / Kontakt</label>
+                        <input type="text" id="modalWorkerPhone" placeholder="Eg: +509 3700-0000" class="glass-input w-full p-2 rounded-xl text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Tarif Pèsonalize</label>
+                        <input type="number" id="modalWorkerCustomRate" placeholder="Kite vid pou 250 HTG" class="glass-input w-full p-2 rounded-xl text-xs">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" onclick="closeWorkerModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                        Anule
+                    </button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl text-xs transition">
+                        Anrejistre Travayè A
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT OVERTIME LOG WITH AUDIT REASON -->
+    <div id="editLogModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden no-print px-4">
+        <div class="ui-card p-6 rounded-2xl w-full max-w-md relative shadow-2xl">
+            <button onclick="closeEditLogModal()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-white text-base">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h3 class="text-lg font-bold mb-4">Koreksyon Lè Siplemantè</h3>
+
+            <form id="editLogForm" onsubmit="saveLogCorrection(event)" class="space-y-3">
+                <input type="hidden" id="editLogId">
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Ansyen Lè</label>
+                    <input type="text" id="editLogOldHours" readonly class="glass-input w-full p-2 rounded-xl text-xs font-bold opacity-60">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Nouvèl Lè *</label>
+                    <input type="number" step="0.5" id="editLogNewHours" required class="glass-input w-full p-2 rounded-xl text-xs font-bold">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Rezon Koreksyon An *</label>
+                    <textarea id="editLogReason" required placeholder="Eg: Erè nan saisie orijinal la..." class="glass-input w-full p-2 rounded-xl text-xs h-20"></textarea>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button type="button" onclick="closeEditLogModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500">Anule</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl text-xs transition">Anrejistre Koreksyon</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toastNotification" class="fixed bottom-16 lg:bottom-5 right-5 z-50 bg-slate-900 border border-slate-700 text-slate-100 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 transition-all transform translate-y-20 opacity-0 pointer-events-none text-xs font-medium">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">Opsyon anrejistre ak siksè</span>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const STORAGE_KEY = 'rickra1n_overtime_db_v4';
+        window.STORAGE_KEY = STORAGE_KEY;
+
+        // LIVE DATE AND TIME CLOCK FUNCTION
+        function startLiveClock() {
+            const dateEl = document.getElementById('liveDateDisplay');
+            const timeEl = document.getElementById('liveTimeDisplay');
+
+            function updateClock() {
+                const now = new Date();
+                
+                // Formate dat an kreyòl / franse
+                const optionsDate = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+                if (dateEl) {
+                    let formattedDate = now.toLocaleDateString('fr-FR', optionsDate);
+                    dateEl.innerText = formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1);
+                }
+
+                // Formate lè (HH:MM:SS)
+                if (timeEl) {
+                    timeEl.innerText = now.toLocaleTimeString('fr-FR');
+                }
+            }
+
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        let appData = {
+            workers: [],
+            overtimeLogs: [],
+            auditLogs: [],
+            settings: {
+                hourlyRate: 250,
+                pinCode: ""
+            }
+        };
+        window.appData = appData;
+
+        function loadStorageData() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    window.appData = {
+                        workers: parsed.workers || [],
+                        overtimeLogs: parsed.overtimeLogs || [],
+                        auditLogs: parsed.auditLogs || [],
+                        settings: {
+                            hourlyRate: parsed.settings?.hourlyRate || 250,
+                            pinCode: parsed.settings?.pinCode || ""
+                        }
+                    };
+                    appData = window.appData;
+                } catch (e) {
+                    console.error("Erè nan lekti done yo:", e);
+                }
+            }
+        }
+
+        function saveStorageData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(window.appData));
+            if (typeof window.saveDataToCloud === 'function') {
+                window.saveDataToCloud(window.appData);
+            }
+            updateAllViews();
+        }
+
+        // QUICK CALCULATOR LOGIC
+        function runQuickCalculator() {
+            const hours = parseFloat(document.getElementById('calcHours')?.value || 0);
+            const rate = parseFloat(document.getElementById('calcRate')?.value || 250);
+            const mult = parseFloat(document.getElementById('calcMultiplier')?.value || 1);
+
+            const total = hours * rate * mult;
+
+            const displayRate = document.getElementById('calcDisplayRate');
+            const displayHours = document.getElementById('calcDisplayHours');
+            const displayTotal = document.getElementById('calcDisplayTotal');
+
+            if (displayRate) displayRate.innerText = `${rate * mult} HTG/h (${mult}x)`;
+            if (displayHours) displayHours.innerText = `${hours} h`;
+            if (displayTotal) displayTotal.innerText = `${formatCurrency(total)} HTG`;
+        }
+
+        // POPULATE DEPARTMENT FILTER DROPDOWNS DYNAMICALLY
+        function populateDepartmentDropdowns() {
+            const depts = Array.from(new Set(appData.workers.map(w => w.department).filter(Boolean)));
+            const dropdowns = ['workerDeptFilter', 'reportDeptFilter'];
+
+            dropdowns.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const currentVal = el.value;
+                let html = '<option value="ALL">Tout Depatman Yo</option>';
+                depts.forEach(d => {
+                    html += `<option value="${d}">${d}</option>`;
+                });
+                el.innerHTML = html;
+                el.value = currentVal;
+            });
+        }
+
+        window.onload = function() {
+            loadStorageData();
+            startLiveClock();
+
+            const today = new Date().toISOString().split('T')[0];
+            if (document.getElementById('otDateInput')) document.getElementById('otDateInput').value = today;
+            if (document.getElementById('bulkDateInput')) document.getElementById('bulkDateInput').value = today;
+
+            if (appData.settings.pinCode && appData.settings.pinCode.trim() !== "") {
+                document.getElementById('pinLockModal').classList.remove('hidden');
+            }
+
+            document.getElementById('settingRateInput').value = appData.settings.hourlyRate;
+            document.getElementById('settingPinInput').value = appData.settings.pinCode || "";
+
+            runQuickCalculator();
+            updateAllViews();
+        };
+
+        function unlockApp(e) {
+            e.preventDefault();
+            if (document.getElementById('pinInput').value === appData.settings.pinCode) {
+                document.getElementById('pinLockModal').classList.add('hidden');
+                document.getElementById('pinError').classList.add('hidden');
+                document.getElementById('pinInput').value = '';
+                showToast("Sistèm débloke ak siksè!");
+            } else {
+                document.getElementById('pinError').classList.remove('hidden');
+            }
+        }
+
+        function lockApp() {
+            if (!appData.settings.pinCode) {
+                showToast("Tanpri mete yon kòd PIN dabò nan Paramèt yo.", true);
+                switchTab('settings');
+                return;
+            }
+            document.getElementById('pinLockModal').classList.remove('hidden');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            const target = document.getElementById(`tab-${tabId}`);
+            if (target) target.classList.remove('hidden');
+
+            document.querySelectorAll('.sidebar-link').forEach(btn => {
+                btn.classList.remove('active');
+                btn.className = "sidebar-link w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 transition";
+            });
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('active');
+                activeNav.className = "sidebar-link active w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition";
+            }
+
+            document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+                btn.className = "mobile-nav-btn flex flex-col items-center py-1 px-2 text-[10px] text-slate-400 font-medium";
+            });
+            const activeMobileNav = document.getElementById(`mobile-nav-${tabId}`);
+            if (activeMobileNav) activeMobileNav.className = "mobile-nav-btn active flex flex-col items-center py-1 px-2 text-[10px] text-emerald-400 font-medium";
+        }
+
+        function updateAllViews() {
+            document.getElementById('statCurrentRate').innerText = `${appData.settings.hourlyRate} HTG`;
+            document.getElementById('formCurrentRate').innerText = `${appData.settings.hourlyRate} HTG/h`;
+
+            populateDepartmentDropdowns();
+            populateWorkerSelects();
+
+            renderDashboard();
+            renderWorkersTable();
+            renderOvertimeLogsTable();
+            renderBulkTable();
+            renderReportsTable();
+            renderIndividualWorkerQuinzaine();
+            renderAuditLogsTable();
+        }
+
+        function openWorkerModal(workerId = null) {
+            const modal = document.getElementById('workerModal');
+            const title = document.getElementById('workerModalTitle');
+            const form = document.getElementById('workerForm');
+
+            form.reset();
+
+            if (workerId) {
+                const w = appData.workers.find(x => x.id === workerId);
+                if (w) {
+                    title.innerText = "Modifye Enfòmasyon Travayè";
+                    document.getElementById('modalWorkerId').value = w.id;
+                    document.getElementById('modalWorkerCustomId').value = w.customId || '';
+                    document.getElementById('modalWorkerName').value = w.name || '';
+                    document.getElementById('modalWorkerPosition').value = w.position || '';
+                    document.getElementById('modalWorkerDept').value = w.department || '';
+                    document.getElementById('modalWorkerPhone').value = w.phone || '';
+                    document.getElementById('modalWorkerCustomRate').value = w.customRate || '';
+                }
+            } else {
+                title.innerText = "Ajoute Yon Travayè Nouvo";
+                document.getElementById('modalWorkerId').value = '';
+                document.getElementById('modalWorkerCustomId').value = `RK-${1000 + appData.workers.length + 1}`;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeWorkerModal() {
+            document.getElementById('workerModal').classList.add('hidden');
+        }
+
+        function saveWorkerForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('modalWorkerId').value;
+            const customId = document.getElementById('modalWorkerCustomId').value.trim();
+            const name = document.getElementById('modalWorkerName').value.trim();
+            const position = document.getElementById('modalWorkerPosition').value.trim();
+            const department = document.getElementById('modalWorkerDept').value.trim();
+            const phone = document.getElementById('modalWorkerPhone').value.trim();
+            const customRate = document.getElementById('modalWorkerCustomRate').value.trim();
+
+            if (!name || !customId) return;
+
+            if (id) {
+                const w = appData.workers.find(x => x.id === id);
+                if (w) {
+                    w.customId = customId;
+                    w.name = name;
+                    w.position = position;
+                    w.department = department;
+                    w.phone = phone;
+                    w.customRate = customRate ? parseFloat(customRate) : null;
+                }
+            } else {
+                appData.workers.push({
+                    id: 'w_' + Date.now(),
+                    customId,
+                    name,
+                    position,
+                    department,
+                    phone,
+                    customRate: customRate ? parseFloat(customRate) : null,
+                    createdAt: new Date().toISOString()
+                });
+            }
+
+            saveStorageData();
+            closeWorkerModal();
+            showToast("Travayè anrejistre ak siksè!");
+        }
+
+        function deleteWorker(workerId) {
+            if (confirm("Èske ou sèten ou vle efase travayè sa a? Tout istorik li ap konsève nan done siplemantè yo.")) {
+                appData.workers = appData.workers.filter(w => w.id !== workerId);
+                saveStorageData();
+                showToast("Travayè a efase.");
+            }
+        }
+
+        function checkDuplicateAndPreview() {
+            calculateOTFormPreview();
+            const workerId = document.getElementById('otWorkerSelect').value;
+            const date = document.getElementById('otDateInput').value;
+            const warningEl = document.getElementById('duplicateWarning');
+
+            if (workerId && date) {
+                const isDuplicate = appData.overtimeLogs.some(l => l.workerId === workerId && l.date === date);
+                if (isDuplicate) {
+                    warningEl.classList.remove('hidden');
+                } else {
+                    warningEl.classList.add('hidden');
+                }
+            } else {
+                warningEl.classList.add('hidden');
+            }
+        }
+
+        function renderAuditLogsTable() {
+            const tbody = document.getElementById('auditLogsTableBody');
+            if (!tbody) return;
+
+            if (appData.auditLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Ankenn koreksyon ki fèt pou kounye a.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = appData.auditLogs.slice().reverse().map(a => `
+                <tr class="hover:bg-slate-800/20 text-xs">
+                    <td class="p-3 opacity-70">${new Date(a.date).toLocaleString('fr-FR')}</td>
+                    <td class="p-3 font-bold text-slate-100">${a.workerName}</td>
+                    <td class="p-3 opacity-80">${a.logDate}</td>
+                    <td class="p-3 font-bold text-rose-400">${a.oldHours} h</td>
+                    <td class="p-3 font-bold text-emerald-400">${a.newHours} h</td>
+                    <td class="p-3 font-medium text-amber-300">${a.reason}</td>
+                </tr>
+            `).join('');
+        }
+
+        function openEditLogModal(logId) {
+            const log = appData.overtimeLogs.find(l => l.id === logId);
+            if (!log) return;
+
+            document.getElementById('editLogId').value = log.id;
+            document.getElementById('editLogOldHours').value = `${log.hours} h`;
+            document.getElementById('editLogNewHours').value = log.hours;
+            document.getElementById('editLogReason').value = '';
+
+            document.getElementById('editLogModal').classList.remove('hidden');
+        }
+
+        function closeEditLogModal() {
+            document.getElementById('editLogModal').classList.add('hidden');
+        }
+
+        function saveLogCorrection(e) {
+            e.preventDefault();
+            const logId = document.getElementById('editLogId').value;
+            const newHours = parseFloat(document.getElementById('editLogNewHours').value);
+            const reason = document.getElementById('editLogReason').value.trim();
+
+            const log = appData.overtimeLogs.find(l => l.id === logId);
+            if (!log) return;
+
+            const w = appData.workers.find(x => x.id === log.workerId);
+
+            appData.auditLogs.push({
+                id: 'audit_' + Date.now(),
+                logId: log.id,
+                workerName: w ? w.name : 'Enkoni',
+                logDate: log.date,
+                oldHours: log.hours,
+                newHours: newHours,
+                reason: reason,
+                date: new Date().toISOString()
+            });
+
+            log.hours = newHours;
+            saveStorageData();
+            closeEditLogModal();
+            showToast("Koreksyon anrejistre nan istwa a!");
+        }
+
+        function advanceLogStatus(logId) {
+            const log = appData.overtimeLogs.find(l => l.id === logId);
+            if (!log) return;
+
+            if (!log.status || log.status === 'ANTRE') {
+                log.status = 'VERIFYE';
+            } else if (log.status === 'VERIFYE') {
+                log.status = 'APWOUVE';
+            }
+            saveStorageData();
+            showToast(`Statut chanje kòm: ${log.status}`);
+        }
+
+        function renderWorkersTable() {
+            const tbody = document.getElementById('workersTableBody');
+            const search = document.getElementById('workerSearchInput').value.toLowerCase().trim();
+            const deptFilter = document.getElementById('workerDeptFilter').value;
+
+            let filtered = appData.workers.filter(w => {
+                const matchesSearch = 
+                    w.name.toLowerCase().includes(search) || 
+                    w.customId.toLowerCase().includes(search) || 
+                    (w.phone && w.phone.toLowerCase().includes(search)) ||
+                    (w.position && w.position.toLowerCase().includes(search)) ||
+                    w.department.toLowerCase().includes(search);
+
+                const matchesDept = (deptFilter === 'ALL') || (w.department === deptFilter);
+                return matchesSearch && matchesDept;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500">Ankenn travayè pa jwenn ak rechèch entèlijan sa a.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(w => `
+                <tr class="hover:bg-slate-800/20">
+                    <td class="p-4 font-mono font-bold text-cyan-400">${w.customId}</td>
+                    <td class="p-4 font-bold">${w.name}</td>
+                    <td class="p-4 text-xs opacity-80">${w.position}</td>
+                    <td class="p-4 text-xs">${w.department}</td>
+                    <td class="p-4 text-xs opacity-80">${w.phone || '-'}</td>
+                    <td class="p-4 text-xs font-semibold text-amber-500">${w.customRate ? w.customRate + ' HTG/h' : '250 HTG/h (Defo)'}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="openWorkerModal('${w.id}')" class="p-2 text-cyan-400 hover:text-cyan-300 transition hover:scale-125"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteWorker('${w.id}')" class="p-2 text-rose-400 hover:text-rose-300 transition hover:scale-125"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function calculateOTFormPreview() {
+            const workerId = document.getElementById('otWorkerSelect').value;
+            const hours = parseFloat(document.getElementById('otHoursInput').value || 0);
+            const mult = parseFloat(document.getElementById('otMultiplierSelect').value || 1);
+
+            const w = appData.workers.find(x => x.id === workerId);
+            const rate = (w && w.customRate) ? parseFloat(w.customRate) : appData.settings.hourlyRate;
+            
+            document.getElementById('formCurrentRate').innerText = `${rate * mult} HTG/h (${mult}x)`;
+            document.getElementById('formCalculatedTotal').innerText = `${formatCurrency(hours * rate * mult)} HTG`;
+        }
+
+        function saveOvertimeEntry(e) {
+            e.preventDefault();
+            const workerId = document.getElementById('otWorkerSelect').value;
+            const date = document.getElementById('otDateInput').value;
+            const hours = parseFloat(document.getElementById('otHoursInput').value);
+            const multiplier = parseFloat(document.getElementById('otMultiplierSelect').value);
+            const notes = document.getElementById('otNoteInput').value.trim();
+
+            if (!workerId || !date || isNaN(hours) || hours <= 0) return;
+
+            const w = appData.workers.find(x => x.id === workerId);
+            const rate = (w && w.customRate) ? parseFloat(w.customRate) : appData.settings.hourlyRate;
+
+            appData.overtimeLogs.push({
+                id: 'ot_' + Date.now(),
+                workerId,
+                date,
+                hours,
+                rate,
+                multiplier,
+                notes,
+                paid: false,
+                paidAt: null,
+                createdAt: new Date().toISOString()
+            });
+
+            saveStorageData();
+            document.getElementById('otHoursInput').value = '';
+            document.getElementById('otNoteInput').value = '';
+            calculateOTFormPreview();
+            showToast("Lè siplemantè anrejistre!");
+        }
+
+        function deleteOvertimeLog(logId) {
+            if (confirm("Efase aksyon sa a?")) {
+                appData.overtimeLogs = appData.overtimeLogs.filter(l => l.id !== logId);
+                saveStorageData();
+                showToast("Aksyon an efase.");
+            }
+        }
+
+        function renderOvertimeLogsTable() {
+            const tbody = document.getElementById('otLogsTableBody');
+            const search = document.getElementById('otSearchInput').value.toLowerCase().trim();
+
+            let unpaidLogs = appData.overtimeLogs.filter(l => !l.paid);
+            if (search) {
+                unpaidLogs = unpaidLogs.filter(l => {
+                    const w = appData.workers.find(x => x.id === l.workerId);
+                    return w && (
+                        w.name.toLowerCase().includes(search) || 
+                        w.customId.toLowerCase().includes(search) || 
+                        w.phone.toLowerCase().includes(search)
+                    );
+                });
+            }
+
+            unpaidLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (unpaidLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Ankenn lè siplemantè an atant.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = unpaidLogs.map(l => {
+                const w = appData.workers.find(x => x.id === l.workerId);
+                const rate = l.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                const mult = l.multiplier || 1;
+                const total = parseFloat(l.hours) * rate * mult;
+                const status = l.status || 'ANTRE';
+
+                let statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-slate-700 text-slate-300 font-bold">1. ANTRE</span>';
+                if (status === 'VERIFYE') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30">2. VERIFYE</span>';
+                if (status === 'APWOUVE') statusBadge = '<span class="px-2 py-0.5 text-xs rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">3. APWOUVE</span>';
+
+                return `
+                    <tr class="hover:bg-slate-800/20">
+                        <td class="p-3 text-xs opacity-80">${l.date}</td>
+                        <td class="p-3 font-bold">${w ? w.name : 'Enkoni'} <span class="text-xs font-mono text-cyan-400">(${w ? w.customId : ''})</span></td>
+                        <td class="p-3 font-bold text-cyan-400">${l.hours}h</td>
+                        <td class="p-3 font-extrabold text-amber-400">${formatCurrency(total)} HTG</td>
+                        <td class="p-3">${statusBadge}</td>
+                        <td class="p-3 text-right space-x-1">
+                            <button onclick="advanceLogStatus('${l.id}')" title="Avanse statut" class="px-2 py-1 text-xs bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 rounded-lg border border-cyan-500/30 font-bold transition">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </button>
+                            <button onclick="openEditLogModal('${l.id}')" title="Modifye / Korije" class="p-1.5 text-amber-400 hover:text-amber-300 transition"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteOvertimeLog('${l.id}')" title="Efase" class="p-1.5 text-rose-400 hover:text-rose-300 transition"><i class="fa-solid fa-trash-can"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function toggleSelectAllBulk(master) {
+            const checkboxes = document.querySelectorAll('.bulk-worker-check');
+            checkboxes.forEach(cb => cb.checked = master.checked);
+        }
+
+        function renderBulkTable() {
+            const tbody = document.getElementById('bulkWorkersTableBody');
+            if (appData.workers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-500">Tanpri ajoute travayè dabò nan meni "Ekip".</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = appData.workers.map(w => `
+                <tr class="hover:bg-slate-800/20">
+                    <td class="p-3">
+                        <input type="checkbox" class="bulk-worker-check rounded border-slate-700 w-4 h-4 text-cyan-500 focus:ring-cyan-400" value="${w.id}">
+                    </td>
+                    <td class="p-3">
+                        <span class="font-mono text-cyan-400 font-bold mr-2">${w.customId}</span>
+                        <span class="font-bold">${w.name}</span>
+                    </td>
+                    <td class="p-3 text-xs opacity-80">${w.department}</td>
+                    <td class="p-3">
+                        <input type="number" step="0.5" min="0" placeholder="Lè (eg: 2)" data-worker-id="${w.id}" class="bulk-hours-input glass-input px-3 py-1.5 rounded-lg text-sm w-32 font-bold text-cyan-400">
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function saveBulkOvertime() {
+            const date = document.getElementById('bulkDateInput').value;
+            const multiplier = parseFloat(document.getElementById('bulkMultiplierSelect').value || 1);
+            const notes = document.getElementById('bulkNoteInput').value.trim();
+
+            if (!date) {
+                showToast("Tanpri chwazi yon dat valid.", true);
+                return;
+            }
+
+            let addedCount = 0;
+            const hourInputs = document.querySelectorAll('.bulk-hours-input');
+
+            hourInputs.forEach(input => {
+                const workerId = input.getAttribute('data-worker-id');
+                const hours = parseFloat(input.value);
+                const checkbox = document.querySelector(`.bulk-worker-check[value="${workerId}"]`);
+
+                if (checkbox && checkbox.checked && !isNaN(hours) && hours > 0) {
+                    const w = appData.workers.find(x => x.id === workerId);
+                    const rate = (w && w.customRate) ? parseFloat(w.customRate) : appData.settings.hourlyRate;
+
+                    appData.overtimeLogs.push({
+                        id: 'ot_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                        workerId,
+                        date,
+                        hours,
+                        rate,
+                        multiplier,
+                        notes,
+                        paid: false,
+                        paidAt: null,
+                        createdAt: new Date().toISOString()
+                    });
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                saveStorageData();
+                showToast(`${addedCount} anrejistreman an gros fèt ak siksè!`);
+                renderBulkTable();
+            } else {
+                showToast("Tanpri koche omwens yon travayè epi antre kantite lè.", true);
+            }
+        }
+
+        function renderIndividualWorkerQuinzaine() {
+            const container = document.getElementById('workerQuinzaineCardsContainer');
+            if (!container) return;
+
+            const selectedWorkerId = document.getElementById('singleWorkerSelect')?.value || 'ALL';
+            const statusFilter = document.getElementById('singleWorkerStatusSelect')?.value || 'ALL';
+
+            let workersToRender = appData.workers;
+            if (selectedWorkerId !== 'ALL') {
+                workersToRender = appData.workers.filter(w => w.id === selectedWorkerId);
+            }
+
+            if (workersToRender.length === 0) {
+                container.innerHTML = `
+                    <div class="glass-panel p-8 text-center text-slate-500 rounded-2xl">
+                        <i class="fa-solid fa-user-slash text-3xl mb-2 opacity-50"></i>
+                        <p>Ankenn travayè pa jwenn.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = workersToRender.map(w => {
+                let logs = appData.overtimeLogs.filter(l => l.workerId === w.id);
+                if (statusFilter === 'UNPAID') logs = logs.filter(l => !l.paid);
+                if (statusFilter === 'PAID') logs = logs.filter(l => l.paid);
+
+                const totalHours = logs.reduce((sum, l) => sum + parseFloat(l.hours || 0), 0);
+                const totalAmount = logs.reduce((sum, l) => {
+                    const rate = l.rate || (w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                    const mult = l.multiplier || 1;
+                    return sum + (parseFloat(l.hours || 0) * rate * mult);
+                }, 0);
+
+                const rows = logs.map(l => {
+                    const rate = l.rate || (w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                    const mult = l.multiplier || 1;
+                    const amount = parseFloat(l.hours || 0) * rate * mult;
+                    return `
+                        <tr class="hover:bg-slate-800/20 text-xs">
+                            <td class="p-3 font-semibold">${l.date}</td>
+                            <td class="p-3 font-bold text-cyan-400">${l.hours} h</td>
+                            <td class="p-3 text-slate-400">${mult}x</td>
+                            <td class="p-3 font-bold text-amber-400">${formatCurrency(amount)} HTG</td>
+                            <td class="p-3">${l.paid ? '<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check mr-1"></i> PEYE</span>' : '<span class="text-rose-400 font-bold"><i class="fa-solid fa-clock mr-1"></i> POKO PEYE</span>'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="glass-panel p-6 rounded-2xl hover-lift space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-700/50 pb-4">
+                            <div>
+                                <span class="text-xs font-mono font-bold text-cyan-400 px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">${w.customId}</span>
+                                <h3 class="text-xl font-bold mt-1 text-slate-100">${w.name}</h3>
+                                <p class="text-xs text-slate-400">${w.position || 'Travayè'} • ${w.department || 'Depatman'}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-2xl font-black text-amber-400">${formatCurrency(totalAmount)} HTG</div>
+                                <div class="text-xs font-bold text-cyan-400">${totalHours.toFixed(1)} èdtan an total</div>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70">
+                                    <tr>
+                                        <th class="p-3">Dat</th>
+                                        <th class="p-3">Èdtan</th>
+                                        <th class="p-3">Majorasyon</th>
+                                        <th class="p-3">Total (HTG)</th>
+                                        <th class="p-3">Estati</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/30">
+                                    ${rows || `<tr><td colspan="5" class="p-4 text-center text-slate-500">Ankenn lè anrejistre pou filtre sa a.</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getQuinzaineKey(dateStr) {
+            if (!dateStr) return 'Peryòd Enkoni';
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return 'Peryòd Enkoni';
+            const year = d.getFullYear();
+            const monthNames = ["Janvye", "Fevriye", "Mas", "Avril", "Mè", "Jwen", "Jiyè", "Out", "Septanm", "Oktòb", "Novanm", "Desanm"];
+            const month = monthNames[d.getMonth()];
+            const day = d.getDate();
+            const quinzaineNum = day <= 15 ? "1e Quinzaine (1-15)" : "2n Quinzaine (16-31)";
+            return `${month} ${year} — ${quinzaineNum}`;
+        }
+
+        function renderReportsTable() {
+            const container = document.getElementById('quinzaineReportsContainer');
+            const periodFilter = document.getElementById('reportPeriodSelect').value;
+            const deptFilter = document.getElementById('reportDeptFilter').value;
+            const search = document.getElementById('reportSearchInput').value.toLowerCase().trim();
+
+            let logsToProcess = appData.overtimeLogs.filter(log => {
+                const w = appData.workers.find(x => x.id === log.workerId);
+                if (!w) return false;
+
+                if (deptFilter !== 'ALL' && w.department !== deptFilter) return false;
+                if (search && !w.name.toLowerCase().includes(search) && !w.customId.toLowerCase().includes(search)) return false;
+
+                if (periodFilter === 'UNPAID_ONLY') return !log.paid;
+                if (periodFilter === 'PAID_ONLY') return log.paid;
+                return true;
+            });
+
+            if (logsToProcess.length === 0) {
+                container.innerHTML = `
+                    <div class="glass-panel p-8 text-center text-slate-500 rounded-2xl">
+                        <i class="fa-solid fa-folder-open text-3xl mb-2 opacity-50"></i>
+                        <p>Ankenn done peman pa jwenn pou kritè sa yo.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const groupedByQuinzaine = {};
+            logsToProcess.forEach(log => {
+                const dateToUse = log.paidAt || log.date;
+                const qKey = getQuinzaineKey(dateToUse);
+
+                if (!groupedByQuinzaine[qKey]) {
+                    groupedByQuinzaine[qKey] = {};
+                }
+
+                if (!groupedByQuinzaine[qKey][log.workerId]) {
+                    groupedByQuinzaine[qKey][log.workerId] = {
+                        worker: appData.workers.find(x => x.id === log.workerId),
+                        totalHours: 0,
+                        totalAmount: 0,
+                        unpaidCount: 0,
+                        paidCount: 0,
+                        logs: []
+                    };
+                }
+
+                const w = appData.workers.find(x => x.id === log.workerId);
+                const rate = log.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                const mult = log.multiplier || 1;
+                const amount = parseFloat(log.hours || 0) * rate * mult;
+
+                groupedByQuinzaine[qKey][log.workerId].totalHours += parseFloat(log.hours || 0);
+                groupedByQuinzaine[qKey][log.workerId].totalAmount += amount;
+                groupedByQuinzaine[qKey][log.workerId].logs.push(log);
+                if (log.paid) groupedByQuinzaine[qKey][log.workerId].paidCount++;
+                else groupedByQuinzaine[qKey][log.workerId].unpaidCount++;
+            });
+
+            let htmlContent = '';
+
+            Object.keys(groupedByQuinzaine).forEach(qKey => {
+                const workerMap = groupedByQuinzaine[qKey];
+                let periodGrandHours = 0;
+                let periodGrandAmount = 0;
+
+                let rowsHtml = Object.keys(workerMap).map(wId => {
+                    const item = workerMap[wId];
+                    periodGrandHours += item.totalHours;
+                    periodGrandAmount += item.totalAmount;
+
+                    const isFullyPaid = item.unpaidCount === 0;
+
+                    return `
+                        <tr class="hover:bg-slate-800/20">
+                            <td class="p-4 font-mono font-bold text-cyan-400">${item.worker ? item.worker.customId : 'N/A'}</td>
+                            <td class="p-4 font-bold text-slate-100">${item.worker ? item.worker.name : 'Enkoni'}</td>
+                            <td class="p-4 text-xs opacity-80">${item.worker ? item.worker.department : '-'}</td>
+                            <td class="p-4 font-bold text-cyan-300">${item.totalHours.toFixed(1)} h</td>
+                            <td class="p-4 font-black text-amber-400">${formatCurrency(item.totalAmount)} HTG</td>
+                            <td class="p-4">
+                                ${isFullyPaid 
+                                    ? '<span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20"><i class="fa-solid fa-check mr-1"></i> PEYE</span>' 
+                                    : `<span class="text-xs px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20"><i class="fa-solid fa-clock mr-1"></i> POKO PEYE (${item.unpaidCount})</span>`}
+                            </td>
+                            <td class="p-4 text-center no-print">
+                                ${!isFullyPaid ? `
+                                    <button onclick="payWorkerAllLogs('${item.worker.id}')" class="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-md transition hover:scale-105 active:scale-95">
+                                        Make Peye (${item.unpaidCount})
+                                    </button>
+                                ` : '<span class="text-xs opacity-50">-</span>'}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                htmlContent += `
+                    <div class="glass-panel rounded-2xl overflow-hidden border border-slate-700/60 hover-lift">
+                        <div class="p-4 bg-slate-900/60 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                                    <i class="fa-solid fa-calendar-check"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-base text-slate-100">${qKey}</h3>
+                                    <p class="text-xs text-slate-400">Detaye chak moun pou 15 jou sa a (${Object.keys(workerMap).length} travayè)</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-400">Total Quinzaine sa a:</span>
+                                <div class="text-lg font-black text-amber-400">${formatCurrency(periodGrandAmount)} HTG</div>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70 bg-slate-900/20">
+                                    <tr>
+                                        <th class="p-4">ID</th>
+                                        <th class="p-4">Non Travayè</th>
+                                        <th class="p-4">Depatman</th>
+                                        <th class="p-4">Kantite Lè (15j)</th>
+                                        <th class="p-4">Total A Peye (HTG)</th>
+                                        <th class="p-4">Estati</th>
+                                        <th class="p-4 text-center no-print">Aksyon</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/30">
+                                    ${rowsHtml}
+                                </tbody>
+                                <tfoot class="font-bold border-t border-slate-700/80 bg-slate-900/40">
+                                    <tr>
+                                        <td colspan="3" class="p-4 text-right font-bold uppercase text-xs opacity-80">TOTAL QUINZAINE SA A:</td>
+                                        <td class="p-4 text-cyan-400 text-base font-extrabold">${periodGrandHours.toFixed(1)} h</td>
+                                        <td class="p-4 text-amber-400 text-lg font-black">${formatCurrency(periodGrandAmount)} HTG</td>
+                                        <td colspan="2"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = htmlContent;
+        }
+
+        function markSingleLogPaid(logId) {
+            const log = appData.overtimeLogs.find(l => l.id === logId);
+            if (log) {
+                log.paid = true;
+                log.paidAt = new Date().toISOString().split('T')[0];
+                saveStorageData();
+                showToast("Lè sa a make kòm PEYE!");
+            }
+        }
+
+        function payWorkerAllLogs(workerId) {
+            const today = new Date().toISOString().split('T')[0];
+            appData.overtimeLogs.forEach(l => {
+                if (l.workerId === workerId && !l.paid) {
+                    l.paid = true;
+                    l.paidAt = today;
+                }
+            });
+            saveStorageData();
+            showToast("Tout lè an atant pou travayè sa make kòm PEYE!");
+        }
+
+        function payAllUnpaidForSelectedFilter() {
+            if (confirm("Èske ou sèten ou vle make tout lè an atant yo kòm PEYE?")) {
+                const today = new Date().toISOString().split('T')[0];
+                appData.overtimeLogs.forEach(l => {
+                    if (!l.paid) {
+                        l.paid = true;
+                        l.paidAt = today;
+                    }
+                });
+                saveStorageData();
+                showToast("Tout lè yo make kòm PEYE!");
+            }
+        }
+
+        function exportToExcel() {
+            if (appData.workers.length === 0) return;
+            const rows = [
+                ["Rickra1n Calcul heure supplementaire - RAPÒ PEMAN"],
+                ["Dat:", new Date().toLocaleDateString('fr-FR')],
+                [],
+                ["ID", "Non Konplè", "Depatman", "Pòs", "Total Lè", "Total (HTG)", "Estati"]
+            ];
+
+            appData.workers.forEach(w => {
+                const logs = appData.overtimeLogs.filter(l => l.workerId === w.id);
+                const totalHours = logs.reduce((sum, l) => sum + parseFloat(l.hours || 0), 0);
+                const totalAmount = logs.reduce((sum, l) => {
+                    const rate = l.rate || (w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                    const mult = l.multiplier || 1;
+                    return sum + (parseFloat(l.hours || 0) * rate * mult);
+                }, 0);
+                rows.push([w.customId, w.name, w.department, w.position, totalHours, totalAmount, logs.some(l => !l.paid) ? "POKO PEYE" : "PEYE"]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Overtime");
+            XLSX.writeFile(wb, `Rickra1n_Heures_${new Date().toISOString().split('T')[0]}.xlsx`);
+            showToast("Fichie Excel telechaje!");
+        }
+
+        function printReport() {
+            document.getElementById('printDateStamp').innerText = `Dat enpresyon: ${new Date().toLocaleString('fr-FR')}`;
+            window.print();
+        }
+
+        function updateHourlyRate(e) {
+            e.preventDefault();
+            const val = parseFloat(document.getElementById('settingRateInput').value);
+            if (!isNaN(val) && val > 0) {
+                appData.settings.hourlyRate = val;
+                saveStorageData();
+                showToast(`Tarif ${val} HTG/h anrejistre!`);
+            }
+        }
+
+        function updatePinCode(e) {
+            e.preventDefault();
+            appData.settings.pinCode = document.getElementById('settingPinInput').value.trim();
+            saveStorageData();
+            showToast("Kòd PIN anrejistre!");
+        }
+
+        function downloadBackupJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = `Rickra1n_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            showToast("Backup JSON telechaje!");
+        }
+
+        function importBackupJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    appData = JSON.parse(evt.target.result);
+                    saveStorageData();
+                    showToast("Done yo re-chaje ak siksè!");
+                } catch (err) {
+                    showToast("Fichie pa valid.", true);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllDataPrompt() {
+            if (confirm("Efase tout done nèt nan sistèm nan?")) {
+                localStorage.removeItem(STORAGE_KEY);
+                appData = { workers: [], overtimeLogs: [], auditLogs: [], settings: { hourlyRate: 250, pinCode: "" } };
+                saveStorageData();
+                showToast("Tout done yo efase.");
+            }
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('fr-HT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount || 0);
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMessage').innerText = msg;
+            toast.className = `fixed bottom-5 right-5 z-50 bg-slate-900 border ${isError ? 'border-rose-500 text-rose-300' : 'border-emerald-500 text-emerald-300'} px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all transform translate-y-0 opacity-100`;
+            setTimeout(() => {
+                toast.className = "fixed bottom-5 right-5 z-50 bg-slate-900 border border-emerald-500/40 text-emerald-300 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all transform translate-y-20 opacity-0 pointer-events-none";
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
