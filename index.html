@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="ht" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rickra1n Calcul heure supplementaire</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (XLSX) CDN for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#ecfeff',
+                            100: '#cffaff',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            800: '#155e75',
+                            900: '#0e3f51',
+                            dark: '#070d19',
+                            cardDark: '#111c35',
+                            accent: '#00f5d4'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* CSS Variables for Dynamic Theme Switch */
+        :root {
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --input-bg: #f1f5f9;
+            --header-bg: rgba(255, 255, 255, 0.85);
+            --accent-glow: rgba(8, 145, 178, 0.15);
+        }
+
+        .dark {
+            --bg-main: #070d19;
+            --bg-card: #111c35;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --input-bg: rgba(15, 23, 42, 0.6);
+            --header-bg: rgba(17, 28, 53, 0.85);
+            --accent-glow: rgba(0, 245, 212, 0.2);
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .glass-panel {
+            background-color: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.12);
+        }
+
+        .glass-input {
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+        .glass-input:focus {
+            border-color: #06b6d4;
+            outline: none;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0891b2;
+            border-radius: 4px;
+        }
+
+        /* Print formatting */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .glass-panel {
+                background: white !important;
+                border: 1px solid #ccc !important;
+                box-shadow: none !important;
+                color: black !important;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #ddd !important;
+                padding: 8px !important;
+                color: black !important;
+            }
+        }
+        .print-only {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-20 md:pb-0">
+
+    <!-- SECURITY LOCK OVERLAY -->
+    <div id="pinLockModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md hidden">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-md text-center border border-cyan-500/30 shadow-2xl">
+            <div class="w-16 h-16 bg-cyan-500/20 text-cyan-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-100 mb-2">Rickra1n Sekirite</h2>
+            <p class="text-slate-400 text-sm mb-6">Antre kòd PIN ou pou gade oswa jere done yo.</p>
+            <form id="pinForm" onsubmit="unlockApp(event)">
+                <input type="password" id="pinInput" maxlength="6" placeholder="****" class="glass-input text-center text-3xl tracking-widest w-full py-3 rounded-xl mb-4 text-cyan-400 font-bold focus:ring-2 focus:ring-cyan-400">
+                <button type="submit" class="w-full bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-cyan-500/20">
+                    Débloke Sistem Nan
+                </button>
+            </form>
+            <p id="pinError" class="text-rose-400 text-sm mt-3 hidden"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Kòd PIN sa pa bon!</p>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="appContainer" class="flex-grow flex flex-col">
+        <!-- HEADER / NAVIGATION -->
+        <header class="glass-panel sticky top-0 z-30 border-b border-slate-700/40 no-print" style="background-color: var(--header-bg);">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-20">
+                    <!-- LOGO & BRANDING -->
+                    <div class="flex items-center space-x-3">
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-300 flex items-center justify-center text-slate-950 shadow-lg shadow-cyan-500/30 font-black text-xl">
+                            R1
+                        </div>
+                        <div>
+                            <h1 class="font-black text-xl sm:text-2xl tracking-tight flex items-center gap-2">
+                                Rickra1n <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">Pro v3.0</span>
+                            </h1>
+                            <p class="text-xs text-slate-400">Calcul heure supplémentaire & Paie</p>
+                        </div>
+                    </div>
+
+                    <!-- DESKTOP NAV -->
+                    <nav class="hidden lg:flex space-x-1">
+                        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                            <i class="fa-solid fa-chart-pie"></i> Tablo Bò
+                        </button>
+                        <button onclick="switchTab('workers')" id="nav-workers" class="nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 text-slate-400 hover:text-cyan-400">
+                            <i class="fa-solid fa-users"></i> Travayè
+                        </button>
+                        <button onclick="switchTab('overtime')" id="nav-overtime" class="nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 text-slate-400 hover:text-cyan-400">
+                            <i class="fa-solid fa-clock"></i> Saisie Lè
+                        </button>
+                        <button onclick="switchTab('bulk')" id="nav-bulk" class="nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 text-slate-400 hover:text-cyan-400">
+                            <i class="fa-solid fa-layer-group"></i> Saisie an Gros
+                        </button>
+                        <button onclick="switchTab('payments')" id="nav-payments" class="nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 text-slate-400 hover:text-cyan-400">
+                            <i class="fa-solid fa-file-invoice-dollar"></i> Rapò & Peman
+                        </button>
+                        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 text-slate-400 hover:text-cyan-400">
+                            <i class="fa-solid fa-gear"></i> Paramèt
+                        </button>
+                    </nav>
+
+                    <!-- QUICK ACTIONS: THEME TOGGLE & LOCK -->
+                    <div class="flex items-center space-x-3">
+                        <!-- Theme Toggle Button -->
+                        <button onclick="toggleTheme()" class="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-cyan-400 hover:opacity-80 transition" title="Chanje Tèm (Light/Dark)">
+                            <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
+                        </button>
+                        <!-- Lock Button -->
+                        <button id="lockBtn" onclick="lockApp()" class="p-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 transition" title="Veriye Aksè">
+                            <i class="fa-solid fa-lock"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MOBILE BOTTOM NAV BAR -->
+        <div class="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 border-t border-slate-800 py-2 px-2 flex justify-around no-print backdrop-blur-md">
+            <button onclick="switchTab('dashboard')" id="mobile-nav-dashboard" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-cyan-400 font-medium">
+                <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i> Tablo
+            </button>
+            <button onclick="switchTab('workers')" id="mobile-nav-workers" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-slate-400 font-medium">
+                <i class="fa-solid fa-users text-lg mb-0.5"></i> Ekip
+            </button>
+            <button onclick="switchTab('overtime')" id="mobile-nav-overtime" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-slate-400 font-medium">
+                <i class="fa-solid fa-clock text-lg mb-0.5"></i> Saisie
+            </button>
+            <button onclick="switchTab('bulk')" id="mobile-nav-bulk" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-slate-400 font-medium">
+                <i class="fa-solid fa-layer-group text-lg mb-0.5"></i> Gros
+            </button>
+            <button onclick="switchTab('payments')" id="mobile-nav-payments" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-slate-400 font-medium">
+                <i class="fa-solid fa-file-invoice-dollar text-lg mb-0.5"></i> Rapò
+            </button>
+            <button onclick="switchTab('settings')" id="mobile-nav-settings" class="mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-slate-400 font-medium">
+                <i class="fa-solid fa-gear text-lg mb-0.5"></i> Opsyon
+            </button>
+        </div>
+
+        <!-- MAIN BODY CONTENT -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+
+            <!-- TAB 1: DASHBOARD OVERVIEW -->
+            <section id="tab-dashboard" class="tab-content space-y-6">
+                <!-- WELCOME BANNER -->
+                <div class="glass-panel p-6 rounded-2xl relative overflow-hidden border-l-4 border-l-cyan-400">
+                    <div class="relative z-10">
+                        <h2 class="text-2xl font-black mb-1">Byenveni sou Rickra1n Overtime System</h2>
+                        <p class="text-sm opacity-80 max-w-2xl">
+                            Kalkile lè siplemantè travayè yo pa quinzaine (15 jou), kreye rapò Excel ak PDF, epi jere tarif ak majorasyon rapidman sou telefòn ak odinatè.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- METRICS GRID -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                    <div class="glass-panel p-5 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider opacity-70">Aksyon Poko Peye</p>
+                            <h3 id="statUnpaidAmount" class="text-2xl font-black text-rose-500 mt-1">0 HTG</h3>
+                            <p id="statUnpaidHours" class="text-xs opacity-70 mt-1">0h siplemantè an atant</p>
+                        </div>
+                        <div class="w-12 h-12 bg-rose-500/10 rounded-xl flex items-center justify-center text-rose-400 text-xl border border-rose-500/20">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider opacity-70">Total Peye (Istwa)</p>
+                            <h3 id="statPaidAmount" class="text-2xl font-black text-emerald-500 mt-1">0 HTG</h3>
+                            <p id="statPaidHours" class="text-xs opacity-70 mt-1">0h peye deja</p>
+                        </div>
+                        <div class="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 text-xl border border-emerald-500/20">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider opacity-70">Moun Nan Ekip La</p>
+                            <h3 id="statTotalWorkers" class="text-2xl font-black text-cyan-500 mt-1">0</h3>
+                            <p class="text-xs opacity-70 mt-1">Travayè anrejistre</p>
+                        </div>
+                        <div class="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center text-cyan-400 text-xl border border-cyan-500/20">
+                            <i class="fa-solid fa-user-group"></i>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wider opacity-70">Tarif Pa Defo</p>
+                            <h3 id="statCurrentRate" class="text-2xl font-black text-amber-500 mt-1">250 HTG</h3>
+                            <p class="text-xs opacity-70 mt-1">Tarif de baz / lè</p>
+                        </div>
+                        <div class="w-12 h-12 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-400 text-xl border border-amber-500/20">
+                            <i class="fa-solid fa-tag"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RECENT OVERTIME AND TOP EARNERS -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-clock-rotate-left text-cyan-400"></i> Dènye Saisie Ki Poko Peye
+                            </h3>
+                            <button onclick="switchTab('overtime')" class="text-xs text-cyan-400 hover:underline font-semibold">
+                                + Ajoute Lè
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70">
+                                    <tr>
+                                        <th class="p-3">Dat</th>
+                                        <th class="p-3">Travayè</th>
+                                        <th class="p-3">Èdtan</th>
+                                        <th class="p-3">Montan</th>
+                                        <th class="p-3 text-right">Aksyon</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboardRecentTable" class="divide-y divide-slate-700/30">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-lg mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-trophy text-amber-400"></i> Moun Ki Fe Plus Lè
+                            </h3>
+                            <div id="topEarnersList" class="space-y-4">
+                                <!-- Dynamic progress bars -->
+                            </div>
+                        </div>
+                        <div class="mt-6 pt-4 border-t border-slate-700/40 text-center">
+                            <button onclick="switchTab('payments')" class="w-full py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-semibold rounded-xl transition">
+                                Gade Rapò Konplè Pa Quinzaine <i class="fa-solid fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: WORKERS MANAGEMENT -->
+            <section id="tab-workers" class="tab-content space-y-6 hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold">Jere Ekip Travayè Yo</h2>
+                        <p class="text-sm opacity-70">Ajoute, modifye oswa retire travayè ak ID inik nan sistèm nan.</p>
+                    </div>
+                    <button onclick="openWorkerModal()" class="bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 font-bold px-5 py-2.5 rounded-xl transition shadow-lg shadow-cyan-500/20 flex items-center gap-2 self-start md:self-auto">
+                        <i class="fa-solid fa-user-plus"></i> Ajoute Yon Travayè
+                    </button>
+                </div>
+
+                <!-- SEARCH & FILTER BAR -->
+                <div class="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+                    <div class="relative flex-grow w-full">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3.5 text-slate-400"></i>
+                        <input type="text" id="workerSearchInput" oninput="renderWorkersTable()" placeholder="Chèche pa non, ID, pòs oswa depatman..." class="glass-input pl-10 pr-4 py-2.5 rounded-xl w-full text-sm">
+                    </div>
+                    <select id="workerDeptFilter" onchange="renderWorkersTable()" class="glass-input px-4 py-2.5 rounded-xl text-sm w-full sm:w-auto">
+                        <option value="ALL">Tout Depatman Yo</option>
+                    </select>
+                </div>
+
+                <!-- WORKERS TABLE -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70">
+                                <tr>
+                                    <th class="p-4">ID Inik</th>
+                                    <th class="p-4">Non Konplè</th>
+                                    <th class="p-4">Pòs / Fonksyon</th>
+                                    <th class="p-4">Depatman</th>
+                                    <th class="p-4">Telefòn</th>
+                                    <th class="p-4">Tarif Pèsonalize</th>
+                                    <th class="p-4 text-center">Aksyon</th>
+                                </tr>
+                            </thead>
+                            <tbody id="workersTableBody" class="divide-y divide-slate-700/30">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: DAILY OVERTIME LOGGING -->
+            <section id="tab-overtime" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-2xl font-bold">Anrejistre Èdtan Siplemantè</h2>
+                    <p class="text-sm opacity-70">Antre lè pou yon travayè ak majorasyon si se dimanch oswa jou ferye.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- ENTRY FORM -->
+                    <div class="glass-panel p-6 rounded-2xl border-t-4 border-t-cyan-400">
+                        <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-business-time text-cyan-400"></i> Formilè Saisie
+                        </h3>
+                        <form id="overtimeForm" onsubmit="saveOvertimeEntry(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase mb-1">Travayè *</label>
+                                <select id="otWorkerSelect" required class="glass-input w-full p-3 rounded-xl text-sm" onchange="calculateOTFormPreview()">
+                                    <option value="">-- Chwazi yon travayè --</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold uppercase mb-1">Dat *</label>
+                                    <input type="date" id="otDateInput" required class="glass-input w-full p-3 rounded-xl text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold uppercase mb-1">Kantite Lè *</label>
+                                    <input type="number" step="0.5" min="0.5" max="24" id="otHoursInput" required oninput="calculateOTFormPreview()" placeholder="Ex: 2.5" class="glass-input w-full p-3 rounded-xl text-sm">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase mb-1">Tip Lè / Majorasyon</label>
+                                <select id="otMultiplierSelect" onchange="calculateOTFormPreview()" class="glass-input w-full p-3 rounded-xl text-sm">
+                                    <option value="1">Lè Nòmal (1.0x - 100%)</option>
+                                    <option value="1.5">Nwit / Dimanch (1.5x - 150%)</option>
+                                    <option value="2.0">Jou Ferye / Konje (2.0x - Double)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase mb-1">Nòt / Rezon</label>
+                                <input type="text" id="otNoteInput" placeholder="Eg: Travay ijan nan fèmti mwa" class="glass-input w-full p-3 rounded-xl text-sm">
+                            </div>
+
+                            <!-- PREVIEW CARD -->
+                            <div class="p-4 rounded-xl border border-slate-700/50 space-y-2 bg-slate-900/40">
+                                <div class="flex justify-between text-xs opacity-80">
+                                    <span>Tarif an aplikasyon:</span>
+                                    <span id="formCurrentRate" class="font-bold text-cyan-400">250 HTG/h</span>
+                                </div>
+                                <div class="flex justify-between text-sm font-bold border-t border-slate-700/50 pt-2 text-cyan-400">
+                                    <span>Montan Kalkile:</span>
+                                    <span id="formCalculatedTotal" class="text-lg">0 HTG</span>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-cyan-500/20">
+                                <i class="fa-solid fa-plus-circle mr-1"></i> Anrejistre Lè Sa A
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- RECENT LOGS LIST -->
+                    <div class="lg:col-span-2 glass-panel p-6 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                                <h3 class="text-lg font-bold flex items-center gap-2">
+                                    <i class="fa-solid fa-list-check text-cyan-400"></i> Fich Saisie Ki Poko Peye
+                                </h3>
+                                <div class="relative w-full sm:w-auto">
+                                    <input type="text" id="otSearchInput" oninput="renderOvertimeLogsTable()" placeholder="Filtrer pa travayè..." class="glass-input px-3 py-1.5 rounded-lg text-xs w-full">
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70">
+                                        <tr>
+                                            <th class="p-3">Dat</th>
+                                            <th class="p-3">Travayè</th>
+                                            <th class="p-3">Èdtan</th>
+                                            <th class="p-3">Majorasyon</th>
+                                            <th class="p-3">Total (HTG)</th>
+                                            <th class="p-3 text-right">Siprime</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="otLogsTableBody" class="divide-y divide-slate-700/30">
+                                        <!-- Dynamic entries -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: BULK OVERTIME ENTRY (SAISIE AN GROS) -->
+            <section id="tab-bulk" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-2xl font-bold">Saisie an Gros (Plizyè Moun Ak Yon Sèl Kou)</h2>
+                    <p class="text-sm opacity-70">Anrejistre lè pou tout oswa plizyè travayè pou yon dat presi san w pa bezwen mete yo youn pa youn.</p>
+                </div>
+
+                <div class="glass-panel p-6 rounded-2xl space-y-6 border-t-4 border-t-teal-400">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase mb-1">Chwazi Dat La *</label>
+                            <input type="date" id="bulkDateInput" class="glass-input w-full p-3 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase mb-1">Majorasyon Pou Tout Moun</label>
+                            <select id="bulkMultiplierSelect" class="glass-input w-full p-3 rounded-xl text-sm">
+                                <option value="1">Lè Nòmal (1.0x)</option>
+                                <option value="1.5">Dimanch / Nwit (1.5x)</option>
+                                <option value="2.0">Jou Ferye (2.0x)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase mb-1">Nòt / Rezon Komen</label>
+                            <input type="text" id="bulkNoteInput" placeholder="Eg: Travay nan week-end" class="glass-input w-full p-3 rounded-xl text-sm">
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70">
+                                <tr>
+                                    <th class="p-3">Koche</th>
+                                    <th class="p-3">ID & Non Travayè</th>
+                                    <th class="p-3">Depatman</th>
+                                    <th class="p-3">Kantite Lè Fèt</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bulkWorkersTableBody" class="divide-y divide-slate-700/30">
+                                <!-- Dynamic bulk entries -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-700/40">
+                        <button onclick="saveBulkOvertime()" class="bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg">
+                            <i class="fa-solid fa-check-double mr-1"></i> Anrejistre Saisie an Gros
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: REPORTS & PAYMENTS -->
+            <section id="tab-payments" class="tab-content space-y-6 hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+                    <div>
+                        <h2 class="text-2xl font-bold">Istwa Peman & Rapò Quinzaine</h2>
+                        <p class="text-sm opacity-70">Gade total pa travayè, make yo peye, epi ekspòte sou Excel oswa PDF.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm shadow-md">
+                            <i class="fa-solid fa-file-excel text-lg"></i> Excel (.xlsx)
+                        </button>
+                        <button onclick="printReport()" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 text-sm">
+                            <i class="fa-solid fa-print"></i> PDF / Enprime
+                        </button>
+                    </div>
+                </div>
+
+                <!-- FILTER BAR -->
+                <div class="glass-panel p-5 rounded-2xl no-print">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div>
+                            <label class="block text-xs font-semibold uppercase mb-1">Peryòd / Estati</label>
+                            <select id="reportPeriodSelect" onchange="renderReportsTable()" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                                <option value="UNPAID_ONLY" selected>Tout Sa Ki POKO PEYE</option>
+                                <option value="PAID_ONLY">Tout Sa Ki PEYE DEJA</option>
+                                <option value="ALL">Tout Tan (Tout Lè Yo)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase mb-1">Depatman</label>
+                            <select id="reportDeptFilter" onchange="renderReportsTable()" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                                <option value="ALL">Tout Depatman</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase mb-1">Chèche Moun</label>
+                            <input type="text" id="reportSearchInput" oninput="renderReportsTable()" placeholder="Non oswa ID..." class="glass-input w-full p-2.5 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <button onclick="payAllUnpaidForSelectedFilter()" class="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black p-2.5 rounded-xl text-sm transition shadow-md">
+                                <i class="fa-solid fa-check-double mr-1"></i> Make Tout Peye
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PRINT HEADER ONLY VISIBLE DURING PRINT -->
+                <div class="print-only mb-6 text-center">
+                    <h1 class="text-2xl font-bold">Rickra1n Calcul heure supplementaire</h1>
+                    <p class="text-sm">Fichie Rezime Peman Heure Supplementaire Pa Travayè</p>
+                    <p class="text-xs text-gray-500 mt-1" id="printDateStamp"></p>
+                </div>
+
+                <!-- PAYROLL SUMMARY TABLE -->
+                <div class="glass-panel rounded-2xl overflow-hidden">
+                    <div class="p-4 bg-slate-900/40 border-b border-slate-700/50 flex justify-between items-center no-print">
+                        <h3 class="font-bold text-base">Rezime Peman Pa Travayè</h3>
+                        <span id="reportCountBadge" class="text-xs px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">0 travayè</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm" id="reportTableToExport">
+                            <thead class="text-xs uppercase border-b border-slate-700/50 opacity-70">
+                                <tr>
+                                    <th class="p-4">ID</th>
+                                    <th class="p-4">Non Travayè</th>
+                                    <th class="p-4">Depatman</th>
+                                    <th class="p-4">Total Èdtan</th>
+                                    <th class="p-4">Total A Peye (HTG)</th>
+                                    <th class="p-4">Estati</th>
+                                    <th class="p-4 text-center no-print">Aksyon</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportTableBody" class="divide-y divide-slate-700/30">
+                                <!-- Dynamic summary -->
+                            </tbody>
+                            <tfoot id="reportTableFooter" class="font-bold border-t-2 border-slate-700">
+                                <!-- Dynamic grand total -->
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: SETTINGS & SECURITY -->
+            <section id="tab-settings" class="tab-content space-y-6 hidden">
+                <div>
+                    <h2 class="text-2xl font-bold">Paramèt & Sekirite System Nan</h2>
+                    <p class="text-sm opacity-70">Konfigure tarif par lè a, modpas/PIN, ak sovgarde done w yo.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="glass-panel p-6 rounded-2xl space-y-4">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-cyan-400"></i> Konfigirasyon Tarif Par Lè
+                        </h3>
+                        <p class="text-xs opacity-70">Tarif pa defo a se 250 HTG/h. Ou ka chanje li nenpòt kilè.</p>
+                        
+                        <form onsubmit="updateHourlyRate(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase mb-1">Tarif Par Lè (Nòmal: 250 HTG)</label>
+                                <div class="relative">
+                                    <input type="number" id="settingRateInput" required min="1" step="1" class="glass-input w-full p-3 pr-16 rounded-xl text-lg font-bold text-cyan-400">
+                                    <span class="absolute right-4 top-3.5 text-slate-400 text-sm font-semibold">HTG / h</span>
+                                </div>
+                            </div>
+                            <button type="submit" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-sm transition">
+                                Anrejistre Tarif Sa A
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl space-y-4">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-cyan-400"></i> Sekirite Ak Kòd PIN
+                        </h3>
+                        <p class="text-xs opacity-70">Proteje aksè sou kalkil yo ak travayè yo lè w mete yon kòd PIN.</p>
+                        
+                        <form onsubmit="updatePinCode(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase mb-1">Nouvèl Kòd PIN (4-6 Chiffres)</label>
+                                <input type="password" id="settingPinInput" placeholder="Kite vid pou w retire PIN sa" maxlength="6" class="glass-input w-full p-3 rounded-xl text-sm tracking-widest font-bold">
+                            </div>
+                            <button type="submit" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 font-bold px-5 py-2.5 rounded-xl text-sm transition">
+                                Anrejistre Kòd PIN
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="glass-panel p-6 rounded-2xl space-y-4 md:col-span-2">
+                        <h3 class="font-bold text-lg flex items-center gap-2">
+                            <i class="fa-solid fa-database text-cyan-400"></i> Sovgarder Ak Restitye Done Yo (Backup)
+                        </h3>
+                        <p class="text-xs opacity-70">Telechaje yon kopi backup (JSON) oswa re-chaje yon ansyen backup pou evite pèdi done w yo.</p>
+
+                        <div class="flex flex-wrap gap-4 pt-2">
+                            <button onclick="downloadBackupJSON()" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-5 py-3 rounded-xl text-sm transition border border-slate-700 flex items-center gap-2">
+                                <i class="fa-solid fa-download text-cyan-400"></i> Telechaje Backup (JSON)
+                            </button>
+
+                            <label class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-5 py-3 rounded-xl text-sm transition border border-slate-700 flex items-center gap-2 cursor-pointer">
+                                <i class="fa-solid fa-upload text-emerald-400"></i> Chaje Yon Backup JSON
+                                <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importBackupJSON(event)">
+                            </label>
+
+                            <button onclick="clearAllDataPrompt()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold px-5 py-3 rounded-xl text-sm transition border border-rose-500/30 ml-auto">
+                                <i class="fa-solid fa-trash-can mr-1"></i> Efase Tout Done System Nan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="glass-panel border-t border-slate-700/40 py-4 text-center text-xs opacity-60 no-print">
+            <p>© 2026 Rickra1n Calcul heure supplementaire — Pro Version</p>
+        </footer>
+    </div>
+
+    <!-- MODAL: ADD / EDIT WORKER -->
+    <div id="workerModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm hidden no-print">
+        <div class="glass-panel p-6 rounded-2xl w-full max-w-lg border border-slate-700 relative shadow-2xl">
+            <button onclick="closeWorkerModal()" class="absolute right-4 top-4 text-slate-400 hover:text-white text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <h3 id="workerModalTitle" class="text-xl font-bold mb-4">Ajoute Yon Travayè Nouvo</h3>
+
+            <form id="workerForm" onsubmit="saveWorkerForm(event)" class="space-y-4">
+                <input type="hidden" id="modalWorkerId">
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">ID Travayè (Inik)</label>
+                        <input type="text" id="modalWorkerCustomId" required placeholder="Eg: RK-1001" class="glass-input w-full p-2.5 rounded-xl text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Non Konplè *</label>
+                        <input type="text" id="modalWorkerName" required placeholder="Eg: Jean Baptiste" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Pòs / Tit Travay</label>
+                        <input type="text" id="modalWorkerPosition" required placeholder="Eg: Mèknisyen" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Depatman</label>
+                        <input type="text" id="modalWorkerDept" required placeholder="Eg: Opérations" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Telefòn / Kontakt</label>
+                        <input type="text" id="modalWorkerPhone" placeholder="Eg: +509 3700-0000" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase mb-1">Tarif Pèsonalize (Opsyonèl)</label>
+                        <input type="number" id="modalWorkerCustomRate" placeholder="Kite vid pou 250 HTG" class="glass-input w-full p-2.5 rounded-xl text-sm">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeWorkerModal()" class="px-4 py-2 rounded-xl text-xs font-bold opacity-70 hover:opacity-100">
+                        Anule
+                    </button>
+                    <button type="submit" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-5 py-2.5 rounded-xl text-xs transition">
+                        Anrejistre Travayè A
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 z-50 bg-slate-900 border border-cyan-500/40 text-cyan-300 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all transform translate-y-20 opacity-0 pointer-events-none">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-cyan-400 text-xl"></i>
+        <span id="toastMessage" class="text-sm font-medium">Opsyon anrejistre ak siksè</span>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const STORAGE_KEY = 'rickra1n_overtime_db_v3';
+
+        let appData = {
+            workers: [],
+            overtimeLogs: [],
+            settings: {
+                hourlyRate: 250,
+                pinCode: "",
+                theme: "dark"
+            }
+        };
+
+        function loadStorageData() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    appData = {
+                        workers: parsed.workers || [],
+                        overtimeLogs: parsed.overtimeLogs || [],
+                        settings: {
+                            hourlyRate: parsed.settings?.hourlyRate || 250,
+                            pinCode: parsed.settings?.pinCode || "",
+                            theme: parsed.settings?.theme || "dark"
+                        }
+                    };
+                } catch (e) {
+                    console.error("Erè nan lekti done yo:", e);
+                }
+            }
+        }
+
+        function saveStorageData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            updateAllViews();
+        }
+
+        window.onload = function() {
+            loadStorageData();
+            
+            // Apply theme
+            if (appData.settings.theme === 'light') {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('themeIcon').className = 'fa-solid fa-sun text-lg text-amber-500';
+            } else {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').className = 'fa-solid fa-moon text-lg text-cyan-400';
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            if (document.getElementById('otDateInput')) document.getElementById('otDateInput').value = today;
+            if (document.getElementById('bulkDateInput')) document.getElementById('bulkDateInput').value = today;
+
+            if (appData.settings.pinCode && appData.settings.pinCode.trim() !== "") {
+                document.getElementById('pinLockModal').classList.remove('hidden');
+            }
+
+            document.getElementById('settingRateInput').value = appData.settings.hourlyRate;
+            document.getElementById('settingPinInput').value = appData.settings.pinCode || "";
+
+            updateAllViews();
+        };
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            appData.settings.theme = isDark ? 'dark' : 'light';
+            document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-moon text-lg text-cyan-400' : 'fa-solid fa-sun text-lg text-amber-500';
+            saveStorageData();
+        }
+
+        function unlockApp(e) {
+            e.preventDefault();
+            if (document.getElementById('pinInput').value === appData.settings.pinCode) {
+                document.getElementById('pinLockModal').classList.add('hidden');
+                document.getElementById('pinError').classList.add('hidden');
+                document.getElementById('pinInput').value = '';
+                showToast("Sistèm débloke ak siksè!");
+            } else {
+                document.getElementById('pinError').classList.remove('hidden');
+            }
+        }
+
+        function lockApp() {
+            if (!appData.settings.pinCode) {
+                showToast("Tanpri mete yon kòd PIN dabò nan Paramèt yo.", true);
+                switchTab('settings');
+                return;
+            }
+            document.getElementById('pinLockModal').classList.remove('hidden');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            const target = document.getElementById(`tab-${tabId}`);
+            if (target) target.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.className = "nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 text-slate-400 hover:text-cyan-400";
+            });
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) activeNav.className = "nav-btn px-4 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
+
+            document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
+                btn.className = "mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-slate-400 font-medium";
+            });
+            const activeMobileNav = document.getElementById(`mobile-nav-${tabId}`);
+            if (activeMobileNav) activeMobileNav.className = "mobile-nav-btn flex flex-col items-center py-1 px-2 text-xs text-cyan-400 font-medium";
+        }
+
+        function updateAllViews() {
+            document.getElementById('statCurrentRate').innerText = `${appData.settings.hourlyRate} HTG`;
+            document.getElementById('formCurrentRate').innerText = `${appData.settings.hourlyRate} HTG/h`;
+
+            populateDepartmentDropdowns();
+            populateWorkerSelects();
+
+            renderDashboard();
+            renderWorkersTable();
+            renderOvertimeLogsTable();
+            renderBulkTable();
+            renderReportsTable();
+        }
+
+        function populateDepartmentDropdowns() {
+            const depts = [...new Set(appData.workers.map(w => w.department).filter(Boolean))];
+            const options = '<option value="ALL">Tout Depatman Yo</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+            document.getElementById('workerDeptFilter').innerHTML = options;
+            document.getElementById('reportDeptFilter').innerHTML = options;
+        }
+
+        function populateWorkerSelects() {
+            const select = document.getElementById('otWorkerSelect');
+            select.innerHTML = '<option value="">-- Chwazi yon travayè --</option>' + 
+                appData.workers.map(w => `<option value="${w.id}">${w.customId} - ${w.name} (${w.department})</option>`).join('');
+        }
+
+        function renderDashboard() {
+            const unpaidLogs = appData.overtimeLogs.filter(l => !l.paid);
+            const unpaidHours = unpaidLogs.reduce((sum, l) => sum + parseFloat(l.hours || 0), 0);
+            const unpaidAmount = unpaidLogs.reduce((sum, l) => {
+                const w = appData.workers.find(x => x.id === l.workerId);
+                const rate = l.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                const mult = l.multiplier || 1;
+                return sum + (parseFloat(l.hours || 0) * rate * mult);
+            }, 0);
+
+            const paidLogs = appData.overtimeLogs.filter(l => l.paid);
+            const paidHours = paidLogs.reduce((sum, l) => sum + parseFloat(l.hours || 0), 0);
+            const paidAmount = paidLogs.reduce((sum, l) => {
+                const w = appData.workers.find(x => x.id === l.workerId);
+                const rate = l.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                const mult = l.multiplier || 1;
+                return sum + (parseFloat(l.hours || 0) * rate * mult);
+            }, 0);
+
+            document.getElementById('statUnpaidAmount').innerText = `${formatCurrency(unpaidAmount)} HTG`;
+            document.getElementById('statUnpaidHours').innerText = `${unpaidHours}h siplemantè an atant`;
+            document.getElementById('statPaidAmount').innerText = `${formatCurrency(paidAmount)} HTG`;
+            document.getElementById('statPaidHours').innerText = `${paidHours}h peye deja`;
+            document.getElementById('statTotalWorkers').innerText = appData.workers.length;
+
+            const recentTbody = document.getElementById('dashboardRecentTable');
+            const recentUnpaid = [...unpaidLogs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+
+            if (recentUnpaid.length === 0) {
+                recentTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-500 text-xs">Ankenn lè ki poko peye pou kounye a.</td></tr>`;
+            } else {
+                recentTbody.innerHTML = recentUnpaid.map(l => {
+                    const w = appData.workers.find(x => x.id === l.workerId);
+                    const rate = l.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                    const mult = l.multiplier || 1;
+                    const lineTotal = parseFloat(l.hours) * rate * mult;
+
+                    return `
+                        <tr class="hover:bg-slate-800/30">
+                            <td class="p-3 text-xs opacity-80">${l.date}</td>
+                            <td class="p-3 font-semibold">${w ? w.name : 'Enkoni'}</td>
+                            <td class="p-3 font-bold text-cyan-400">${l.hours}h</td>
+                            <td class="p-3 font-bold text-amber-500">${formatCurrency(lineTotal)} HTG</td>
+                            <td class="p-3 text-right">
+                                <button onclick="markSingleLogPaid('${l.id}')" class="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-semibold hover:bg-emerald-500/30">
+                                    Make Peye
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            renderTopEarners();
+        }
+
+        function renderTopEarners() {
+            const workerTotals = {};
+            appData.overtimeLogs.forEach(l => {
+                const w = appData.workers.find(x => x.id === l.workerId);
+                const rate = l.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                const mult = l.multiplier || 1;
+                const total = parseFloat(l.hours) * rate * mult;
+                workerTotals[l.workerId] = (workerTotals[l.workerId] || 0) + total;
+            });
+
+            const sortedWorkerIds = Object.keys(workerTotals).sort((a, b) => workerTotals[b] - workerTotals[a]).slice(0, 4);
+            const container = document.getElementById('topEarnersList');
+
+            if (sortedWorkerIds.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">Poko gen enfòmasyon sou kalkil yo.</p>`;
+                return;
+            }
+
+            const maxAmount = Math.max(...Object.values(workerTotals), 1);
+
+            container.innerHTML = sortedWorkerIds.map(wId => {
+                const w = appData.workers.find(x => x.id === wId);
+                const amount = workerTotals[wId];
+                const pct = Math.min(100, Math.round((amount / maxAmount) * 100));
+
+                return `
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-medium">
+                            <span>${w ? w.name : 'Enkoni'}</span>
+                            <span class="text-cyan-400 font-bold">${formatCurrency(amount)} HTG</span>
+                        </div>
+                        <div class="w-full bg-slate-700/40 rounded-full h-2 overflow-hidden">
+                            <div class="bg-gradient-to-r from-cyan-500 to-teal-400 h-2 rounded-full" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openWorkerModal(workerId = null) {
+            const modal = document.getElementById('workerModal');
+            document.getElementById('workerForm').reset();
+
+            if (workerId) {
+                const w = appData.workers.find(x => x.id === workerId);
+                if (w) {
+                    document.getElementById('workerModalTitle').innerText = "Modifye Travayè A";
+                    document.getElementById('modalWorkerId').value = w.id;
+                    document.getElementById('modalWorkerCustomId').value = w.customId;
+                    document.getElementById('modalWorkerName').value = w.name;
+                    document.getElementById('modalWorkerPosition').value = w.position;
+                    document.getElementById('modalWorkerDept').value = w.department;
+                    document.getElementById('modalWorkerPhone').value = w.phone || '';
+                    document.getElementById('modalWorkerCustomRate').value = w.customRate || '';
+                }
+            } else {
+                document.getElementById('workerModalTitle').innerText = "Ajoute Yon Nouvo Travayè";
+                document.getElementById('modalWorkerId').value = '';
+                document.getElementById('modalWorkerCustomId').value = `RK-${appData.workers.length + 1001}`;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeWorkerModal() {
+            document.getElementById('workerModal').classList.add('hidden');
+        }
+
+        function saveWorkerForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('modalWorkerId').value;
+            const customId = document.getElementById('modalWorkerCustomId').value.trim();
+            const name = document.getElementById('modalWorkerName').value.trim();
+            const position = document.getElementById('modalWorkerPosition').value.trim();
+            const department = document.getElementById('modalWorkerDept').value.trim();
+            const phone = document.getElementById('modalWorkerPhone').value.trim();
+            const customRate = document.getElementById('modalWorkerCustomRate').value.trim();
+
+            if (id) {
+                const index = appData.workers.findIndex(w => w.id === id);
+                if (index !== -1) {
+                    appData.workers[index] = { ...appData.workers[index], customId, name, position, department, phone, customRate };
+                    showToast("Enfòmasyon travayè a modifye!");
+                }
+            } else {
+                appData.workers.push({
+                    id: 'w_' + Date.now(),
+                    customId,
+                    name,
+                    position,
+                    department,
+                    phone,
+                    customRate,
+                    createdAt: new Date().toISOString()
+                });
+                showToast("Travayè a ajoute ak siksè!");
+            }
+
+            saveStorageData();
+            closeWorkerModal();
+        }
+
+        function deleteWorker(workerId) {
+            const w = appData.workers.find(x => x.id === workerId);
+            if (w && confirm(`Èske ou sèten ou vle efase ${w.name}?`)) {
+                appData.workers = appData.workers.filter(x => x.id !== workerId);
+                appData.overtimeLogs = appData.overtimeLogs.filter(l => l.workerId !== workerId);
+                saveStorageData();
+                showToast("Travayè a efase.");
+            }
+        }
+
+        function renderWorkersTable() {
+            const tbody = document.getElementById('workersTableBody');
+            const search = document.getElementById('workerSearchInput').value.toLowerCase().trim();
+            const deptFilter = document.getElementById('workerDeptFilter').value;
+
+            let filtered = appData.workers.filter(w => {
+                const matchesSearch = w.name.toLowerCase().includes(search) || w.customId.toLowerCase().includes(search) || w.department.toLowerCase().includes(search);
+                const matchesDept = (deptFilter === 'ALL') || (w.department === deptFilter);
+                return matchesSearch && matchesDept;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500">Ankenn travayè pa jwenn.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(w => `
+                <tr class="hover:bg-slate-800/20">
+                    <td class="p-4 font-mono font-bold text-cyan-400">${w.customId}</td>
+                    <td class="p-4 font-bold">${w.name}</td>
+                    <td class="p-4 text-xs opacity-80">${w.position}</td>
+                    <td class="p-4 text-xs">${w.department}</td>
+                    <td class="p-4 text-xs opacity-80">${w.phone || '-'}</td>
+                    <td class="p-4 text-xs font-semibold text-amber-500">${w.customRate ? w.customRate + ' HTG/h' : '250 HTG/h (Defo)'}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="openWorkerModal('${w.id}')" class="p-2 text-cyan-400 hover:text-cyan-300"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteWorker('${w.id}')" class="p-2 text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function calculateOTFormPreview() {
+            const workerId = document.getElementById('otWorkerSelect').value;
+            const hours = parseFloat(document.getElementById('otHoursInput').value || 0);
+            const mult = parseFloat(document.getElementById('otMultiplierSelect').value || 1);
+
+            const w = appData.workers.find(x => x.id === workerId);
+            const rate = (w && w.customRate) ? parseFloat(w.customRate) : appData.settings.hourlyRate;
+            
+            document.getElementById('formCurrentRate').innerText = `${rate * mult} HTG/h (${mult}x)`;
+            document.getElementById('formCalculatedTotal').innerText = `${formatCurrency(hours * rate * mult)} HTG`;
+        }
+
+        function saveOvertimeEntry(e) {
+            e.preventDefault();
+            const workerId = document.getElementById('otWorkerSelect').value;
+            const date = document.getElementById('otDateInput').value;
+            const hours = parseFloat(document.getElementById('otHoursInput').value);
+            const multiplier = parseFloat(document.getElementById('otMultiplierSelect').value);
+            const notes = document.getElementById('otNoteInput').value.trim();
+
+            if (!workerId || !date || isNaN(hours) || hours <= 0) return;
+
+            const w = appData.workers.find(x => x.id === workerId);
+            const rate = (w && w.customRate) ? parseFloat(w.customRate) : appData.settings.hourlyRate;
+
+            appData.overtimeLogs.push({
+                id: 'ot_' + Date.now(),
+                workerId,
+                date,
+                hours,
+                rate,
+                multiplier,
+                notes,
+                paid: false,
+                paidAt: null,
+                createdAt: new Date().toISOString()
+            });
+
+            saveStorageData();
+            document.getElementById('otHoursInput').value = '';
+            document.getElementById('otNoteInput').value = '';
+            calculateOTFormPreview();
+            showToast("Lè siplemantè anrejistre!");
+        }
+
+        function deleteOvertimeLog(logId) {
+            if (confirm("Efase aksyon sa a?")) {
+                appData.overtimeLogs = appData.overtimeLogs.filter(l => l.id !== logId);
+                saveStorageData();
+                showToast("Aksyon an efase.");
+            }
+        }
+
+        function renderOvertimeLogsTable() {
+            const tbody = document.getElementById('otLogsTableBody');
+            const search = document.getElementById('otSearchInput').value.toLowerCase().trim();
+
+            let unpaidLogs = appData.overtimeLogs.filter(l => !l.paid);
+            if (search) {
+                unpaidLogs = unpaidLogs.filter(l => {
+                    const w = appData.workers.find(x => x.id === l.workerId);
+                    return w && w.name.toLowerCase().includes(search);
+                });
+            }
+
+            unpaidLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if (unpaidLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">Ankenn lè siplemantè an atant.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = unpaidLogs.map(l => {
+                const w = appData.workers.find(x => x.id === l.workerId);
+                const rate = l.rate || (w && w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                const mult = l.multiplier || 1;
+                const lineTotal = parseFloat(l.hours) * rate * mult;
+
+                return `
+                    <tr class="hover:bg-slate-800/20">
+                        <td class="p-3 text-xs opacity-80">${l.date}</td>
+                        <td class="p-3 font-semibold">${w ? w.name : 'Enkoni'}</td>
+                        <td class="p-3 font-bold text-cyan-400">${l.hours}h</td>
+                        <td class="p-3 text-xs">${mult}x</td>
+                        <td class="p-3 font-bold text-amber-500">${formatCurrency(lineTotal)} HTG</td>
+                        <td class="p-3 text-right">
+                            <button onclick="deleteOvertimeLog('${l.id}')" class="text-rose-400 hover:text-rose-300"><i class="fa-solid fa-trash-can"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderBulkTable() {
+            const tbody = document.getElementById('bulkWorkersTableBody');
+            if (appData.workers.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-500">Poko gen travayè pou antre lè an gros.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = appData.workers.map(w => `
+                <tr class="hover:bg-slate-800/20">
+                    <td class="p-3"><input type="checkbox" class="bulk-check rounded text-cyan-500" value="${w.id}" checked></td>
+                    <td class="p-3 font-bold">${w.name} <span class="text-xs font-mono text-cyan-400">(${w.customId})</span></td>
+                    <td class="p-3 text-xs">${w.department}</td>
+                    <td class="p-3">
+                        <input type="number" step="0.5" min="0" placeholder="0" class="bulk-hours glass-input w-24 p-2 rounded-lg text-sm" data-worker-id="${w.id}">
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function saveBulkOvertime() {
+            const date = document.getElementById('bulkDateInput').value;
+            const mult = parseFloat(document.getElementById('bulkMultiplierSelect').value);
+            const note = document.getElementById('bulkNoteInput').value.trim();
+
+            if (!date) {
+                showToast("Tanpri chwazi dat la.", true);
+                return;
+            }
+
+            let count = 0;
+            document.querySelectorAll('.bulk-hours').forEach(input => {
+                const hours = parseFloat(input.value);
+                const workerId = input.getAttribute('data-worker-id');
+                const checkbox = input.closest('tr').querySelector('.bulk-check');
+
+                if (checkbox.checked && !isNaN(hours) && hours > 0) {
+                    const w = appData.workers.find(x => x.id === workerId);
+                    const rate = (w && w.customRate) ? parseFloat(w.customRate) : appData.settings.hourlyRate;
+
+                    appData.overtimeLogs.push({
+                        id: 'ot_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+                        workerId,
+                        date,
+                        hours,
+                        rate,
+                        multiplier: mult,
+                        notes: note,
+                        paid: false,
+                        paidAt: null,
+                        createdAt: new Date().toISOString()
+                    });
+                    count++;
+                }
+            });
+
+            if (count > 0) {
+                saveStorageData();
+                showToast(`Saisie an gros anrejistre pou ${count} travayè!`);
+                switchTab('overtime');
+            } else {
+                showToast("Okenn kantite lè valid pa te rantre.", true);
+            }
+        }
+
+        function renderReportsTable() {
+            const tbody = document.getElementById('reportTableBody');
+            const tfoot = document.getElementById('reportTableFooter');
+            const periodFilter = document.getElementById('reportPeriodSelect').value;
+            const deptFilter = document.getElementById('reportDeptFilter').value;
+            const search = document.getElementById('reportSearchInput').value.toLowerCase().trim();
+
+            const workerSummaries = [];
+
+            appData.workers.forEach(worker => {
+                if ((deptFilter !== 'ALL' && worker.department !== deptFilter) ||
+                    (!worker.name.toLowerCase().includes(search) && !worker.customId.toLowerCase().includes(search))) {
+                    return;
+                }
+
+                let workerLogs = appData.overtimeLogs.filter(l => l.workerId === worker.id);
+                if (periodFilter === 'UNPAID_ONLY') workerLogs = workerLogs.filter(l => !l.paid);
+                else if (periodFilter === 'PAID_ONLY') workerLogs = workerLogs.filter(l => l.paid);
+
+                if (workerLogs.length > 0) {
+                    const totalHours = workerLogs.reduce((s, l) => s + parseFloat(l.hours || 0), 0);
+                    const totalAmount = workerLogs.reduce((s, l) => {
+                        const rate = l.rate || (worker.customRate ? parseFloat(worker.customRate) : appData.settings.hourlyRate);
+                        const mult = l.multiplier || 1;
+                        return s + (parseFloat(l.hours || 0) * rate * mult);
+                    }, 0);
+
+                    workerSummaries.push({
+                        worker,
+                        totalHours,
+                        totalAmount,
+                        hasUnpaid: workerLogs.some(l => !l.paid)
+                    });
+                }
+            });
+
+            document.getElementById('reportCountBadge').innerText = `${workerSummaries.length} travayè`;
+
+            if (workerSummaries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-500">Ankenn done pa jwenn.</td></tr>`;
+                tfoot.innerHTML = '';
+                return;
+            }
+
+            let grandHours = 0;
+            let grandAmount = 0;
+
+            tbody.innerHTML = workerSummaries.map(item => {
+                grandHours += item.totalHours;
+                grandAmount += item.totalAmount;
+
+                return `
+                    <tr class="hover:bg-slate-800/20">
+                        <td class="p-4 font-mono font-bold text-cyan-400">${item.worker.customId}</td>
+                        <td class="p-4 font-bold">${item.worker.name}</td>
+                        <td class="p-4 text-xs">${item.worker.department}</td>
+                        <td class="p-4 font-bold text-cyan-400">${item.totalHours} h</td>
+                        <td class="p-4 font-black text-amber-500">${formatCurrency(item.totalAmount)} HTG</td>
+                        <td class="p-4">${item.hasUnpaid ? '<span class="text-xs text-rose-400 font-bold">POKO PEYE</span>' : '<span class="text-xs text-emerald-400 font-bold">PEYE</span>'}</td>
+                        <td class="p-4 text-center no-print">
+                            ${item.hasUnpaid ? `<button onclick="payWorkerAllLogs('${item.worker.id}')" class="px-3 py-1 bg-emerald-500 text-slate-950 font-bold text-xs rounded-lg">Make Peye</button>` : '-'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tfoot.innerHTML = `
+                <tr>
+                    <td colspan="3" class="p-4 text-right font-bold uppercase">TOTAL EKIP LA:</td>
+                    <td class="p-4 text-cyan-400 text-lg">${grandHours} h</td>
+                    <td class="p-4 text-amber-500 text-xl font-black">${formatCurrency(grandAmount)} HTG</td>
+                    <td colspan="2"></td>
+                </tr>
+            `;
+        }
+
+        function markSingleLogPaid(logId) {
+            const log = appData.overtimeLogs.find(l => l.id === logId);
+            if (log) {
+                log.paid = true;
+                log.paidAt = new Date().toISOString().split('T')[0];
+                saveStorageData();
+                showToast("Lè sa a make kòm PEYE!");
+            }
+        }
+
+        function payWorkerAllLogs(workerId) {
+            const today = new Date().toISOString().split('T')[0];
+            appData.overtimeLogs.forEach(l => {
+                if (l.workerId === workerId && !l.paid) {
+                    l.paid = true;
+                    l.paidAt = today;
+                }
+            });
+            saveStorageData();
+            showToast("Tout lè an atant pou travayè sa make kòm PEYE!");
+        }
+
+        function payAllUnpaidForSelectedFilter() {
+            if (confirm("Èske ou sèten ou vle make tout lè an atant yo kòm PEYE?")) {
+                const today = new Date().toISOString().split('T')[0];
+                appData.overtimeLogs.forEach(l => {
+                    if (!l.paid) {
+                        l.paid = true;
+                        l.paidAt = today;
+                    }
+                });
+                saveStorageData();
+                showToast("Tout lè yo make kòm PEYE!");
+            }
+        }
+
+        function exportToExcel() {
+            if (appData.workers.length === 0) return;
+            const rows = [
+                ["Rickra1n Calcul heure supplementaire - RAPÒ PEMAN"],
+                ["Dat:", new Date().toLocaleDateString('fr-FR')],
+                [],
+                ["ID", "Non Konplè", "Depatman", "Pòs", "Total Lè", "Total (HTG)", "Estati"]
+            ];
+
+            appData.workers.forEach(w => {
+                const logs = appData.overtimeLogs.filter(l => l.workerId === w.id);
+                const totalHours = logs.reduce((sum, l) => sum + parseFloat(l.hours || 0), 0);
+                const totalAmount = logs.reduce((sum, l) => {
+                    const rate = l.rate || (w.customRate ? parseFloat(w.customRate) : appData.settings.hourlyRate);
+                    const mult = l.multiplier || 1;
+                    return sum + (parseFloat(l.hours || 0) * rate * mult);
+                }, 0);
+                rows.push([w.customId, w.name, w.department, w.position, totalHours, totalAmount, logs.some(l => !l.paid) ? "POKO PEYE" : "PEYE"]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Overtime");
+            XLSX.writeFile(wb, `Rickra1n_Heures_${new Date().toISOString().split('T')[0]}.xlsx`);
+            showToast("Fichie Excel telechaje!");
+        }
+
+        function printReport() {
+            document.getElementById('printDateStamp').innerText = `Dat enpresyon: ${new Date().toLocaleString('fr-FR')}`;
+            window.print();
+        }
+
+        function updateHourlyRate(e) {
+            e.preventDefault();
+            const val = parseFloat(document.getElementById('settingRateInput').value);
+            if (!isNaN(val) && val > 0) {
+                appData.settings.hourlyRate = val;
+                saveStorageData();
+                showToast(`Tarif ${val} HTG/h anrejistre!`);
+            }
+        }
+
+        function updatePinCode(e) {
+            e.preventDefault();
+            appData.settings.pinCode = document.getElementById('settingPinInput').value.trim();
+            saveStorageData();
+            showToast("Kòd PIN anrejistre!");
+        }
+
+        function downloadBackupJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = `Rickra1n_Backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            showToast("Backup JSON telechaje!");
+        }
+
+        function importBackupJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    appData = JSON.parse(evt.target.result);
+                    saveStorageData();
+                    showToast("Done yo re-chaje ak siksè!");
+                } catch (err) {
+                    showToast("Fichie pa valid.", true);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function clearAllDataPrompt() {
+            if (confirm("Efase tout done nèt nan sistèm nan?")) {
+                localStorage.removeItem(STORAGE_KEY);
+                appData = { workers: [], overtimeLogs: [], settings: { hourlyRate: 250, pinCode: "", theme: "dark" } };
+                saveStorageData();
+                showToast("Tout done yo efase.");
+            }
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('fr-HT', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount || 0);
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastMessage').innerText = msg;
+            toast.className = `fixed bottom-5 right-5 z-50 bg-slate-900 border ${isError ? 'border-rose-500 text-rose-300' : 'border-cyan-500 text-cyan-300'} px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all transform translate-y-0 opacity-100`;
+            setTimeout(() => {
+                toast.className = "fixed bottom-5 right-5 z-50 bg-slate-900 border border-cyan-500/40 text-cyan-300 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all transform translate-y-20 opacity-0 pointer-events-none";
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
